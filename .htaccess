@@ -1,0 +1,8 @@
+# Safety net: if the domain points at the project folder instead of public/,
+# forward everything into public/ and keep config, src and storage unreachable.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(config|src|storage|sql|bin|lang|templates|vendor)(/|$) - [F,L]
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+Options -Indexes

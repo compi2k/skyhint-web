@@ -1,0 +1,248 @@
+<?php
+declare(strict_types=1);
+
+namespace PlanetAlerts;
+
+use DateTimeImmutable;
+use DateTimeZone;
+
+/**
+ * The mail job. Runs every 15 minutes from cron.
+ *
+ * Per user: once it is 15:00 in the time zone of their first alert, every
+ * enabled alert is checked for tonight and everything found goes out in ONE
+ * mail, with a section per place. On Sundays the weekly overview follows the
+ * same pattern. If the calc service is down, later runs retry until 20:00,
+ * then the day is skipped and reported. Each event is logged per alert, so
+ * nothing is ever sent twice.
+ */
+final class AlertJob
+{
+    public const SEND_HOUR = 15;
+    public const GIVE_UP_HOUR = 20;
+    public const DIGEST_WEEKDAY = 0;   // Sunday
+    public const STATUS_HOUR = 18;     // owner status mail, owner's local time
+
+    private array $log = [];
+
+    public function __construct(private DateTimeImmutable $now, private bool $dryRun = false) {}
+
+    public function run(): array
+    {
+        $this->heartbeat();
+        $users = App::db()->all(
+            'SELECT u.* FROM users u
+             WHERE u.email_verified_at IS NOT NULL AND u.mail_enabled = 1
+               AND EXISTS (SELECT 1 FROM alerts a WHERE a.user_id = u.id AND a.enabled = 1)');
+
+        foreach ($users as $user) {
+            $alerts = Alerts::forUser((int) $user['id'], true);
+            $tz = Alerts::mailTimezone($alerts);
+            $local = $this->now->setTimezone(new DateTimeZone($tz));
+            $hour = (int) $local->format('G');
+            if ($hour < self::SEND_HOUR) {
+                continue;
+            }
+            $date = $local->format('Y-m-d');
+            if ($user['paused_until'] !== null && $user['paused_until'] >= $date) {
+                continue;
+            }
+            $style = Prefs::style($user['mail_style']);
+            if (Prefs::wantsAlerts($style)) {
+                $this->step($user, $alerts, $date, 'alerts', $hour);
+            }
+            if (Prefs::wantsDigest($style) && (int) $local->format('w') === self::DIGEST_WEEKDAY) {
+                $this->step($user, $alerts, $date, 'digest', $hour);
+            }
+        }
+        $this->maybeStatusMail();
+        if (!$this->dryRun) {
+            // the start page reads the city of the week from the cache only
+            array_push($this->log, ...WeekCity::prepare($this->now));
+        }
+        return $this->log;
+    }
+
+    private function step(array $user, array $alerts, string $date, string $kind, int $hour): void
+    {
+        $db = App::db();
+        $run = $db->one('SELECT * FROM mail_runs WHERE user_id = ? AND local_date = ? AND kind = ?',
+            [$user['id'], $date, $kind]);
+        if ($run && in_array($run['status'], ['done', 'skipped'], true)) {
+            return;
+        }
+        $label = "$kind user {$user['id']} $date";
+        if ($hour >= self::GIVE_UP_HOUR) {
+            $this->record((int) $user['id'], $date, $kind, 'skipped', 0, $run['message'] ?? 'not processed before 20:00');
+            $this->log[] = "SKIPPED $label";
+            return;
+        }
+        try {
+            [$sent, $ok] = $kind === 'alerts' ? $this->alerts($user, $alerts) : $this->digest($user, $alerts, $date);
+            if (!$ok) {
+                $this->record((int) $user['id'], $date, $kind, 'failed', 0, 'mail could not be sent, see storage/logs/app.log');
+                $this->log[] = "FAILED $label: mail could not be sent";
+                return;
+            }
+            $this->record((int) $user['id'], $date, $kind, 'done', $sent, '');
+            if ($sent) {
+                $this->log[] = "done $label: mail sent";
+            }
+        } catch (CalcException $e) {
+            $this->record((int) $user['id'], $date, $kind, 'failed', 0, $e->getMessage());
+            $this->log[] = "FAILED $label: " . $e->getMessage();
+        }
+    }
+
+    /** @return array{int, bool} [mails sent, ok] */
+    private function alerts(array $user, array $alerts): array
+    {
+        $db = App::db();
+        $groups = [];
+        foreach ($alerts as $a) {
+            $night = Alerts::nightFor($a, $this->now);
+            $events = Prefs::filter($a['prefs'], App::calc()->events((int) $a['city_id'], $night, $night));
+            $found = count($events);
+            $events = array_values(array_filter($events, static fn ($e) => !$db->value(
+                'SELECT 1 FROM sent_log WHERE user_id = ? AND event_key = ?', [$user['id'], "a{$a['id']}:{$e['key']}"])));
+            if ($events) {
+                $groups[] = ['alert' => $a, 'events' => $events];
+            }
+            if (!$this->dryRun && $found) {
+                Stats::bump('events_found', $found);
+            }
+        }
+        if (!$groups) {
+            return [0, true];
+        }
+        if ($this->dryRun) {
+            foreach ($groups as $g) {
+                $this->log[] = "  would send {$user['email']} [" . Alerts::label($g['alert']) . ']: '
+                    . implode(', ', array_column($g['events'], 'key'));
+            }
+            return [1, true];
+        }
+        if (!Emails::alerts($user, $groups)) {
+            return [0, false];
+        }
+        Stats::bump('mails_alerts');
+        Stats::bump('events_sent', array_sum(array_map(static fn ($g) => count($g['events']), $groups)));
+        foreach ($groups as $g) {
+            foreach ($g['events'] as $e) {
+                $db->run('INSERT IGNORE INTO sent_log (user_id, event_key, sent_at) VALUES (?, ?, ?)',
+                    [$user['id'], "a{$g['alert']['id']}:{$e['key']}", Db::now()]);
+            }
+        }
+        return [1, true];
+    }
+
+    /** @return array{int, bool} */
+    private function digest(array $user, array $alerts, string $date): array
+    {
+        $calc = App::calc();
+        $sections = [];
+        foreach ($alerts as $a) {
+            $start = Alerts::nightFor($a, $this->now);
+            $end = (new DateTimeImmutable($start))->modify('+6 days')->format('Y-m-d');
+            $sections[] = [
+                'alert'  => $a,
+                'nights' => $calc->nights((int) $a['city_id'], $start, $end),
+                'events' => Prefs::filter($a['prefs'], $calc->events((int) $a['city_id'], $start, $end)),
+            ];
+        }
+        if ($this->dryRun) {
+            $this->log[] = "  would send digest to {$user['email']} (" . count($sections) . ' place(s))';
+            return [1, true];
+        }
+        if (Emails::digest($user, $sections)) {
+            Stats::bump('mails_digest');
+            return [1, true];
+        }
+        return [0, false];
+    }
+
+    /** Every run notes that it ran and whether the calc server answered. */
+    private function heartbeat(): void
+    {
+        if ($this->dryRun) {
+            return;
+        }
+        $db = App::db();
+        $t0 = microtime(true);
+        try {
+            App::calc()->health();
+            $ok = 1;
+            $ms = (int) round((microtime(true) - $t0) * 1000);
+        } catch (CalcException) {
+            $ok = 0;
+            $ms = null;
+        }
+        $db->run('INSERT INTO status_checks (checked_at, calc_ok, calc_ms) VALUES (?, ?, ?)', [Db::now(), $ok, $ms]);
+        $db->run("REPLACE INTO app_state (name, value) VALUES ('job_last_run', ?)", [Db::now()]);
+    }
+
+    private function record(int $userId, string $date, string $kind, string $status, int $mails, string $msg): void
+    {
+        if ($this->dryRun) {
+            return;
+        }
+        App::db()->run(
+            'INSERT INTO mail_runs (user_id, local_date, kind, status, attempts, mails_sent, message, updated_at)
+             VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE status = VALUES(status), attempts = attempts + 1,
+                mails_sent = VALUES(mails_sent), message = VALUES(message), updated_at = VALUES(updated_at)',
+            [$userId, $date, $kind, $status, $mails, mb_substr($msg, 0, 500), Db::now()]);
+    }
+
+    /** Daily report to the owner. A missing report means the job isn't running. */
+    private function maybeStatusMail(): void
+    {
+        $owner = (string) App::config('app.owner_email', '');
+        if ($owner === '' || $this->dryRun) {
+            return;
+        }
+        $local = $this->now->setTimezone(new DateTimeZone((string) App::config('app.owner_timezone', 'UTC')));
+        if ((int) $local->format('G') < self::STATUS_HOUR) {
+            return;
+        }
+        $db = App::db();
+        $today = $local->format('Y-m-d');
+        if ($db->value("SELECT value FROM app_state WHERE name = 'status_mail'") === $today) {
+            return;
+        }
+        $since = gmdate('Y-m-d H:i:s', time() - 86400);
+        $runs = $db->all('SELECT status, COUNT(*) n, SUM(mails_sent) mails FROM mail_runs
+                          WHERE updated_at >= ? GROUP BY status', [$since]);
+        $by = array_column($runs, null, 'status');
+        $problems = $db->all("SELECT * FROM mail_runs WHERE updated_at >= ? AND status IN ('failed','skipped')
+                              ORDER BY updated_at DESC LIMIT 20", [$since]);
+        try {
+            $health = App::calc()->health();
+            $calcLine = 'Calc service: ok, ' . $health['cities_loaded'] . ' cities loaded';
+        } catch (CalcException $e) {
+            $calcLine = 'Calc service: NOT REACHABLE (' . $e->getMessage() . ')';
+        }
+        $lines = [
+            'Last 24 hours:',
+            sprintf('Users checked: %d done, %d failed (retrying), %d skipped',
+                $by['done']['n'] ?? 0, $by['failed']['n'] ?? 0, $by['skipped']['n'] ?? 0),
+            'Mails sent: ' . (int) ($by['done']['mails'] ?? 0),
+            sprintf('Users: %d total, %d verified, %d receiving mail. Alerts: %d (%d enabled)',
+                $db->value('SELECT COUNT(*) FROM users'),
+                $db->value('SELECT COUNT(*) FROM users WHERE email_verified_at IS NOT NULL'),
+                $db->value('SELECT COUNT(*) FROM users WHERE email_verified_at IS NOT NULL AND mail_enabled = 1'),
+                $db->value('SELECT COUNT(*) FROM alerts'),
+                $db->value('SELECT COUNT(*) FROM alerts WHERE enabled = 1')),
+            $calcLine,
+        ];
+        foreach ($problems as $p) {
+            $lines[] = "Problem: {$p['kind']} user {$p['user_id']} {$p['local_date']} {$p['status']}: {$p['message']}";
+        }
+        $bad = ($by['skipped']['n'] ?? 0) > 0 || str_contains($calcLine, 'NOT');
+        $subject = App::name() . ' status ' . $today . ($bad ? ': needs attention' : ': ok');
+        if (Emails::status($owner, $subject, $lines)) {
+            $db->run("REPLACE INTO app_state (name, value) VALUES ('status_mail', ?)", [$today]);
+            $this->log[] = 'status mail sent';
+        }
+    }
+}

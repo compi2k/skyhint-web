@@ -1,0 +1,17 @@
+# Send every request that isn't a real file to index.php
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Pass the Authorization header on to PHP (needed for the API with PHP-FPM)
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+Options -Indexes
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|js|svg|png|ico)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+</IfModule>
