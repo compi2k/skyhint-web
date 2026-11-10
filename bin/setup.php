@@ -29,6 +29,9 @@ foreach (['pdo_mysql', 'curl', 'mbstring', 'openssl'] as $ext) {
     $say(extension_loaded($ext), "PHP extension $ext");
 }
 $say(defined('PASSWORD_ARGON2ID'), 'Argon2id password hashing (falls back to bcrypt if missing)');
+$raw = (string) file_get_contents(APP_ROOT . '/config/config.php');
+$say(mb_check_encoding($raw, 'UTF-8'), 'config.php saved as UTF-8' . (mb_check_encoding($raw, 'UTF-8') ? ''
+    : ': NO. Umlauts are converted for now, but please save it as UTF-8 in your editor'));
 $say(strlen((string) App::config('app.secret_key')) >= 32 && App::config('app.secret_key') !== 'CHANGE-ME',
     'app.secret_key set');
 $say(str_starts_with((string) App::config('app.url'), 'https://'), 'app.url uses https: ' . App::config('app.url'));
@@ -68,6 +71,29 @@ try {
         $db->pdo()->exec('ALTER TABLE users DROP COLUMN city_id, DROP COLUMN prefs');
         $db->pdo()->exec('DROP TABLE IF EXISTS job_runs');
         $say(true, "upgraded to multiple alerts: $moved account(s) moved to their first alert");
+    }
+
+    // v3: mail time slot per account, newest announced night per place
+    $added = [];
+    foreach ([
+        ['users', 'mail_slot', "ENUM('morning','midday','afternoon','evening') NOT NULL DEFAULT 'afternoon' AFTER mail_style"],
+        ['users', 'mail_tz', 'VARCHAR(64) NULL AFTER mail_slot'],
+        ['alerts', 'last_night', 'DATE NULL AFTER enabled'],
+    ] as [$table, $column, $def]) {
+        $has = (int) $db->value('SELECT COUNT(*) FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?', [$table, $column]);
+        if (!$has) {
+            $db->pdo()->exec("ALTER TABLE $table ADD COLUMN $column $def");
+            $added[] = "$table.$column";
+        }
+    }
+    if ($added) {
+        // existing accounts keep getting their mail in the afternoon, in their first place's time zone
+        $db->run("UPDATE users u SET u.mail_tz = (
+                      SELECT c.timezone FROM alerts a JOIN cities c ON c.id = a.city_id
+                      WHERE a.user_id = u.id ORDER BY a.enabled DESC, a.created_at, a.id LIMIT 1)
+                  WHERE u.mail_tz IS NULL");
+        $say(true, 'upgraded: mail time slots (' . implode(', ', $added) . ')');
     }
 
     $tables = $db->all('SHOW TABLES');

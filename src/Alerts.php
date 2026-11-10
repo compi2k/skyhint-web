@@ -74,10 +74,7 @@ final class Alerts
                 'country' => $alert['city_country'], 'timezone' => $alert['city_timezone']];
     }
 
-    /**
-     * Mails go out at 15:00 in the time zone of the user's first enabled alert.
-     * Returns null when the user has no alert at all.
-     */
+    /** Time zone of the first enabled place (fallback for accounts without a mail time zone). */
     public static function mailTimezone(array $alerts): ?string
     {
         foreach ($alerts as $a) {
@@ -89,12 +86,75 @@ final class Alerts
     }
 
     /**
-     * Date of "tonight" in a city, seen from a moment that may be morning elsewhere.
-     * Until 06:00 local the night that started yesterday is still running.
+     * Which nights a mail sent now should announce for this place, as Y-m-d.
+     *
+     * Normally one: the next night whose darkness has not begun yet, so the
+     * mail always arrives ahead of time, whatever the slot and however far
+     * away the place is ("tonight" before dusk, "tomorrow night" after).
+     * If the mail time drifted past dusk since the last mail (daylight saving,
+     * dusk getting earlier), the night that was skipped is added as long as it
+     * is still running, so no night falls through the gap.
+     * @return list<string> oldest first; the last one is the "target"
      */
-    public static function nightFor(array $alert, DateTimeImmutable $at): string
+    public static function nightsToAnnounce(array $alert, DateTimeImmutable $now): array
     {
-        return $at->setTimezone(new DateTimeZone($alert['city_timezone']))->modify('-6 hours')->format('Y-m-d');
+        $tz = new DateTimeZone($alert['city_timezone']);
+        $local = $now->setTimezone($tz);
+        $days = [
+            $local->modify('-1 day')->format('Y-m-d'),
+            $local->format('Y-m-d'),
+            $local->modify('+1 day')->format('Y-m-d'),
+        ];
+        $nights = [];
+        foreach (App::calc()->nights((int) $alert['city_id'], $days[0], $days[2]) as $n) {
+            $nights[$n['date']] = $n;
+        }
+        $target = $days[2];
+        foreach ([$days[1], $days[2]] as $d) {
+            if (self::darkStart($nights[$d] ?? null, $d, $tz) > $now) {
+                $target = $d;
+                break;
+            }
+        }
+        $out = [];
+        $last = $alert['last_night'] ?? null;
+        foreach ($days as $d) {
+            if ($d >= $target) {
+                break;
+            }
+            if ($last !== null && $d > $last && self::darkEnd($nights[$d] ?? null, $d, $tz) > $now) {
+                $out[] = $d;
+            }
+        }
+        $out[] = $target;
+        return $out;
+    }
+
+    private static function darkStart(?array $night, string $date, DateTimeZone $tz): DateTimeImmutable
+    {
+        $start = $night['dark'][0]['start'] ?? null;
+        return $start ? new DateTimeImmutable($start) : new DateTimeImmutable("$date 20:00", $tz);   // no darkness: white night
+    }
+
+    private static function darkEnd(?array $night, string $date, DateTimeZone $tz): DateTimeImmutable
+    {
+        $dark = $night['dark'] ?? [];
+        return $dark ? new DateTimeImmutable($dark[count($dark) - 1]['end'])
+                     : (new DateTimeImmutable("$date 04:00", $tz))->modify('+1 day');
+    }
+
+    /** "tonight" or "tomorrow" seen from the place itself. */
+    public static function when(array $alert, string $night, DateTimeImmutable $now): string
+    {
+        $today = $now->setTimezone(new DateTimeZone($alert['city_timezone']))->format('Y-m-d');
+        return $night > $today ? 'tomorrow' : 'tonight';
+    }
+
+    /** Remembers the newest night announced, see nightsToAnnounce(). */
+    public static function markAnnounced(int $alertId, string $night): void
+    {
+        App::db()->run('UPDATE alerts SET last_night = ? WHERE id = ? AND (last_night IS NULL OR last_night < ?)',
+            [$night, $alertId, $night]);
     }
 
     private static function hydrate(array $row): array

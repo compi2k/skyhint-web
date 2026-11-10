@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
     email_verified_at  DATETIME     NULL,
     lang               CHAR(2)      NOT NULL DEFAULT 'de',
     mail_style         ENUM('alerts','digest','both') NOT NULL DEFAULT 'alerts',
+    mail_slot          ENUM('morning','midday','afternoon','evening') NOT NULL DEFAULT 'afternoon',
+    mail_tz            VARCHAR(64)  NULL,                    -- IANA time zone for the slot, NULL = first place
     mail_enabled       TINYINT(1)   NOT NULL DEFAULT 1,       -- master switch, unsubscribe sets 0
     paused_until       DATE         NULL,
     unsubscribe_token  CHAR(32)     NOT NULL,
@@ -36,6 +38,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     city_id     INT UNSIGNED NOT NULL,
     prefs       JSON         NOT NULL,                        -- {"planets": [...], "events": [...]}
     enabled     TINYINT(1)   NOT NULL DEFAULT 1,
+    last_night  DATE         NULL,                            -- newest night a mail announced
     created_at  DATETIME     NOT NULL,
     updated_at  DATETIME     NOT NULL,
     KEY ix_alerts_user (user_id),

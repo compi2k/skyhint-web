@@ -33,6 +33,9 @@ final class Dashboard
             'title'  => I18n::t('account.title'),
             'u'      => $user,
             'style'  => Prefs::style($user['mail_style']),
+            'slot'   => \PlanetAlerts\MailTime::slot($user['mail_slot'] ?? null),
+            'tz'     => \PlanetAlerts\MailTime::timezone($user, \PlanetAlerts\Alerts::forUser((int) $user['id'])),
+            'placeZones' => array_values(array_unique(array_column(\PlanetAlerts\Alerts::forUser((int) $user['id']), 'city_timezone'))),
             'keys'   => ApiKeys::forUser((int) $user['id']),
             'newKey' => $newKey,
             'paused' => $user['paused_until'] !== null && $user['paused_until'] >= gmdate('Y-m-d'),
@@ -46,9 +49,11 @@ final class Dashboard
         $style = Prefs::style(Http::post('style'));
         $lang = I18n::valid(Http::post('lang')) ? Http::post('lang') : $user['lang'];
         $mailEnabled = Http::post('mail_enabled') === '1' ? 1 : 0;
+        $slot = \PlanetAlerts\MailTime::slot(Http::post('mail_slot'));
+        $tz = \PlanetAlerts\MailTime::validTimezone(Http::post('mail_tz')) ? Http::post('mail_tz') : $user['mail_tz'];
 
-        App::db()->run('UPDATE users SET mail_style = ?, lang = ?, mail_enabled = ? WHERE id = ?',
-            [$style, $lang, $mailEnabled, $user['id']]);
+        App::db()->run('UPDATE users SET mail_style = ?, lang = ?, mail_enabled = ?, mail_slot = ?, mail_tz = ? WHERE id = ?',
+            [$style, $lang, $mailEnabled, $slot, $tz, $user['id']]);
         setcookie('lang', $lang, ['expires' => time() + 31536000, 'path' => '/',
             'secure' => Http::isHttps(), 'httponly' => true, 'samesite' => 'Lax']);
         I18n::set($lang);

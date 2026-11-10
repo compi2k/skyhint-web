@@ -32,7 +32,9 @@ $r->get('/find', [Pages::class, 'find']);
 $r->get('/search', [Pages::class, 'search']);
 $r->get('/city/{id}', [Pages::class, 'city']);
 $r->get('/privacy', [Pages::class, 'privacy']);
-$r->get('/imprint', [Pages::class, 'imprint']);
+$r->get('/imprint', [Pages::class, 'imprint']);      // old address, still works
+$r->get('/impressum', [Pages::class, 'imprint']);
+$r->get('/legal-notice', [Pages::class, 'imprint']);
 $r->get('/api', [Pages::class, 'apiDocs']);
 $r->get('/status', [Status::class, 'page']);
 $r->get('/status.json', [Status::class, 'json']);

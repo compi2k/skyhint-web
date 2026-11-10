@@ -51,12 +51,15 @@ final class Auth
     public static function register(string $email, string $password, int $cityId, string $lang): int
     {
         $db = App::db();
-        $db->run('INSERT INTO users (email, password_hash, lang, mail_style, unsubscribe_token, created_at)
-                  VALUES (?, ?, ?, ?, ?, ?)', [
+        $tz = $db->value('SELECT timezone FROM cities WHERE id = ?', [$cityId]);
+        $db->run('INSERT INTO users (email, password_hash, lang, mail_style, mail_slot, mail_tz, unsubscribe_token, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [
             self::normalizeEmail($email),
             password_hash($password, self::algo()),
             $lang,
             'alerts',
+            MailTime::DEFAULT_SLOT,
+            MailTime::validTimezone($tz) ? $tz : null,
             bin2hex(random_bytes(16)),
             Db::now(),
         ]);

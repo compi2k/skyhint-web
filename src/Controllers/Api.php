@@ -153,8 +153,16 @@ final class Api
         $style = array_key_exists('style', $in) ? Prefs::style((string) $in['style']) : $user['mail_style'];
         $mail = array_key_exists('mail_enabled', $in) ? (int) (bool) $in['mail_enabled'] : (int) $user['mail_enabled'];
         $lang = I18n::valid($in['lang'] ?? null) ? $in['lang'] : $user['lang'];
-        App::db()->run('UPDATE users SET mail_style = ?, mail_enabled = ?, lang = ? WHERE id = ?',
-            [$style, $mail, $lang, $user['id']]);
+        if (array_key_exists('mail_slot', $in) && (!is_string($in['mail_slot']) || !isset(\PlanetAlerts\MailTime::SLOTS[$in['mail_slot']]))) {
+            self::error(400, 'invalid_mail_slot', 'mail_slot must be one of: ' . implode(', ', array_keys(\PlanetAlerts\MailTime::SLOTS)) . '.');
+        }
+        if (array_key_exists('mail_tz', $in) && !\PlanetAlerts\MailTime::validTimezone($in['mail_tz'])) {
+            self::error(400, 'invalid_mail_tz', 'mail_tz must be an IANA time zone such as Europe/Berlin.');
+        }
+        $slot = \PlanetAlerts\MailTime::slot($in['mail_slot'] ?? $user['mail_slot']);
+        $tz = $in['mail_tz'] ?? $user['mail_tz'];
+        App::db()->run('UPDATE users SET mail_style = ?, mail_enabled = ?, lang = ?, mail_slot = ?, mail_tz = ? WHERE id = ?',
+            [$style, $mail, $lang, $slot, $tz, $user['id']]);
         self::respond(self::meOut(\PlanetAlerts\Auth::find((int) $user['id'])));
     }
 
@@ -274,6 +282,8 @@ final class Api
             'lang'         => $u['lang'],
             'style'        => Prefs::style($u['mail_style']),
             'mail_enabled' => (bool) $u['mail_enabled'],
+            'mail_slot'    => \PlanetAlerts\MailTime::slot($u['mail_slot'] ?? null),
+            'mail_tz'      => \PlanetAlerts\MailTime::timezone($u, Alerts::forUser((int) $u['id'])),
             'paused_until' => $u['paused_until'],
             'alerts'       => array_map([self::class, 'alertOut'], Alerts::forUser((int) $u['id'])),
         ];

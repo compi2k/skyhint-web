@@ -50,7 +50,8 @@ final class AlertsPage
             'calcDown' => $calcDown,
             'days'     => self::PREVIEW_DAYS,
             'max'      => Alerts::MAX_PER_USER,
-            'mailTz'   => $alerts ? Alerts::mailTimezone($alerts) : null,
+            'mailTz'   => \PlanetAlerts\MailTime::timezone($user, $alerts),
+            'mailSlot' => \PlanetAlerts\MailTime::slot($user['mail_slot'] ?? null),
             'paused'   => $user['paused_until'] !== null && $user['paused_until'] >= gmdate('Y-m-d'),
         ]);
     }

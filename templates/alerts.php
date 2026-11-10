@@ -6,8 +6,7 @@ use PlanetAlerts\Prefs;
 $verified = $u['email_verified_at'] !== null;
 $full = count($alerts) >= $max;
 $multi = count($alerts) > 1;
-$mailCity = null;
-foreach ($alerts as $a) { if ($a['enabled']) { $mailCity = $a['city_name']; break; } }
+$anyOn = (bool) array_filter($alerts, static fn ($a) => $a['enabled']);
 ?>
 <section class="dash dash-wide">
   <div class="title-row">
@@ -39,9 +38,13 @@ foreach ($alerts as $a) { if ($a['enabled']) { $mailCity = $a['city_name']; brea
   <?php if (!$alerts): ?>
     <p class="lead"><?= e(t('alerts.empty')) ?></p>
   <?php else: ?>
-    <p class="lead"><?= e($mailCity
-        ? t('alerts.lead', ['n' => count($alerts), 'max' => $max, 'city' => $mailCity])
-        : t('alerts.lead_all_off', ['n' => count($alerts), 'max' => $max])) ?></p>
+    <p class="lead"><?php if ($anyOn): ?>
+      <?= e(t('alerts.lead', ['n' => count($alerts), 'max' => $max,
+          'slot' => \PlanetAlerts\MailTime::label($mailSlot), 'tz' => \PlanetAlerts\MailTime::zoneLabel($mailTz)])) ?>
+      <a href="/account#mails"><?= e(t('alerts.lead_change')) ?></a>
+    <?php else: ?>
+      <?= e(t('alerts.lead_all_off', ['n' => count($alerts), 'max' => $max])) ?>
+    <?php endif; ?></p>
 
     <ul class="alert-list">
       <?php foreach ($alerts as $a): $label = Alerts::label($a); ?>

@@ -495,3 +495,30 @@ select { font: inherit; color: var(--ink); background: var(--paper); border: 1px
 .hb-w18 { width: 90%; }
 .hb-w19 { width: 95%; }
 .hb-w20 { width: 100%; }
+
+/* optional banner across the top (config 'banner'); same colours in light and dark mode */
+.site-banner { padding: .55rem max(var(--gutter), calc((100% - var(--wrap)) / 2 + var(--gutter))); font-size: .95rem; line-height: 1.4; }
+.site-banner p { margin: 0; text-align: center; }
+.site-banner a { color: inherit; font-weight: 700; margin-left: .35rem; text-underline-offset: 2px; white-space: nowrap; }
+.banner-info { background: #1F4FB8; color: #fff; }
+.banner-warning { background: #F5C542; color: #1B1B1B; }
+.banner-danger { background: #B3261E; color: #fff; }
+.banner-construction { background: #F5C542; color: #1B1B1B; font-weight: 600; position: relative; padding-bottom: calc(.55rem + 6px); }
+.banner-construction::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
+  background: repeating-linear-gradient(-45deg, #1B1B1B 0 10px, #F5C542 10px 20px); }
+.site-banner a:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+/* privacy page: 4-column table, stacked on phones */
+.privacy.prose { max-width: 60rem; }
+.privacy-table { font-size: .95rem; }
+.privacy-table th[scope=row] { font-weight: 600; text-align: left; }
+.privacy-table td, .privacy-table th { vertical-align: top; }
+@media (max-width: 44rem) {
+  .privacy-table thead { display: none; }
+  .privacy-table, .privacy-table tbody, .privacy-table tr, .privacy-table th, .privacy-table td { display: block; width: 100%; }
+  .privacy-table tr { border-top: 1px solid var(--line); padding: .6rem 0; }
+  .privacy-table th[scope=row], .privacy-table td { border: 0; padding: .1rem 0; }
+  .privacy-table td::before { content: attr(data-label) ": "; color: var(--slate); font-weight: 600; }
+}
+.callout.objection { border-left-color: var(--dusk); }
+.callout.objection h2 { margin-top: 0; }

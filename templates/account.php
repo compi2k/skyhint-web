@@ -20,6 +20,36 @@ $verified = $u['email_verified_at'] !== null;
       <?php endforeach; ?>
     </fieldset>
 
+    <fieldset class="field">
+      <legend><?= e(t('dash.slot')) ?></legend>
+      <p class="hint"><?= e(t('dash.slot_hint')) ?></p>
+      <?php foreach (array_keys(\PlanetAlerts\MailTime::SLOTS) as $sl): ?>
+        <label class="choice"><input type="radio" name="mail_slot" value="<?= $sl ?>" <?= $slot === $sl ? 'checked' : '' ?>>
+          <?= e(ucfirst(\PlanetAlerts\MailTime::label($sl))) ?></label>
+      <?php endforeach; ?>
+      <p class="hint"><?= e(t('slot.evening.note')) ?></p>
+    </fieldset>
+
+    <div class="field">
+      <label for="mail_tz"><?= e(t('dash.tz')) ?></label>
+      <select id="mail_tz" name="mail_tz">
+        <?php if ($placeZones): ?>
+          <optgroup label="<?= e(t('dash.tz_places')) ?>">
+            <?php foreach ($placeZones as $z): ?>
+              <option value="<?= e($z) ?>" <?= $tz === $z ? 'selected' : '' ?>><?= e(\PlanetAlerts\MailTime::zoneLabel($z)) ?> (<?= e($z) ?>)</option>
+            <?php endforeach; ?>
+          </optgroup>
+        <?php endif; ?>
+        <?php foreach (\PlanetAlerts\MailTime::zonesGrouped() as $region => $zones): ?>
+          <optgroup label="<?= e($region) ?>">
+            <?php foreach ($zones as $z => $name): ?>
+              <option value="<?= e($z) ?>" <?= $tz === $z && !in_array($z, $placeZones, true) ? 'selected' : '' ?>><?= e($name) ?></option>
+            <?php endforeach; ?>
+          </optgroup>
+        <?php endforeach; ?>
+      </select>
+    </div>
+
     <div class="field">
       <label for="lang"><?= e(t('field.lang')) ?></label>
       <select id="lang" name="lang">

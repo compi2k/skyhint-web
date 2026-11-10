@@ -12,9 +12,18 @@ use PlanetAlerts\I18n;
   <link rel="icon" href="<?= e(asset('icon.svg')) ?>" type="image/svg+xml">
   <link rel="stylesheet" href="<?= e(asset('style.css')) ?>">
   <script src="<?= e(asset('app.js')) ?>" defer></script>
+  <?php if (\PlanetAlerts\Matomo::enabled()): ?>
+  <script src="<?= e(asset('stats.js')) ?>" data-url="<?= e(\PlanetAlerts\Matomo::url()) ?>" data-site="<?= \PlanetAlerts\Matomo::siteId() ?>" defer></script>
+  <?php endif; ?>
 </head>
 <body>
   <a class="skip" href="#main"><?= e(t('nav.skip')) ?></a>
+  <?php if ($banner = \PlanetAlerts\Banner::current()): ?>
+    <div class="site-banner banner-<?= e($banner['style']) ?>" role="note">
+      <p><?= e($banner['text']) ?><?php if ($banner['url']): ?>
+        <a href="<?= e($banner['url']) ?>"><?= e($banner['link']) ?></a><?php endif; ?></p>
+    </div>
+  <?php endif; ?>
   <header class="site-header">
     <a class="brand" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 17h20"/><circle cx="16" cy="10" r="2.5"/></svg><?= e(App::name()) ?></a>
     <nav aria-label="<?= e(t('nav.label')) ?>">
@@ -49,7 +58,7 @@ use PlanetAlerts\I18n;
   <footer class="site-footer">
     <p>
       <a href="/privacy"><?= e(t('nav.privacy')) ?></a>
-      <a href="/imprint"><?= e(t('nav.imprint')) ?></a>
+      <a href="<?= e(t('nav.imprint_url')) ?>"><?= e(t('nav.imprint')) ?></a>
       <a href="/api"><?= e(t('nav.api')) ?></a>
       <a href="/status"><?= e(t('nav.status')) ?></a>
       <a href="<?= e((string) App::config('app.source_url', 'https://github.com/compi2k/skyhint-web')) ?>"><?= e(t('nav.source')) ?></a>

@@ -12,7 +12,7 @@ final class App
 
     public static function boot(array $config): void
     {
-        self::$config = $config;
+        self::$config = self::utf8($config);
         $debug = (bool) self::config('app.debug', false);
         ini_set('display_errors', $debug ? '1' : '0');
         error_reporting(E_ALL);
@@ -21,6 +21,22 @@ final class App
     }
 
     /** Dot notation lookup: App::config('mail.from'). */
+    /**
+     * config.php saved in a Windows encoding (ANSI) instead of UTF-8 would show
+     * "f\u{FFFD}r" instead of "für". Such strings are converted from Windows-1252;
+     * setup.php warns about it.
+     */
+    public static function utf8(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            return array_map([self::class, 'utf8'], $value);
+        }
+        if (is_string($value) && !mb_check_encoding($value, 'UTF-8')) {
+            return mb_convert_encoding($value, 'UTF-8', 'Windows-1252');
+        }
+        return $value;
+    }
+
     public static function config(string $key, mixed $default = null): mixed
     {
         $value = self::$config;

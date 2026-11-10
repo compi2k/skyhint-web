@@ -9,21 +9,22 @@ use DateTimeZone;
 /**
  * The mail job. Runs every 15 minutes from cron.
  *
- * Per user: once it is 15:00 in the time zone of their first alert, every
- * enabled alert is checked for tonight and everything found goes out in ONE
- * mail, with a section per place. On Sundays the weekly overview follows the
- * same pattern. If the calc service is down, later runs retry until 20:00,
- * then the day is skipped and reported. Each event is logged per alert, so
- * nothing is ever sent twice.
+ * Per user: once their mail time has come (a slot such as 15–17 in a time
+ * zone they choose, see MailTime), every enabled place is checked for the
+ * next night that has not started there yet, and everything found goes out
+ * in ONE mail with a section per place. On Sundays the weekly overview
+ * follows the same pattern. If the calc service or the mail server fails,
+ * later runs retry for a few hours, then the day is skipped and reported.
+ * Each event is logged per place, so nothing is ever sent twice.
  */
 final class AlertJob
 {
-    public const SEND_HOUR = 15;
-    public const GIVE_UP_HOUR = 20;
     public const DIGEST_WEEKDAY = 0;   // Sunday
     public const STATUS_HOUR = 18;     // owner status mail, owner's local time
 
     private array $log = [];
+    /** alert id => newest night announced in this run */
+    private array $announced = [];
 
     public function __construct(private DateTimeImmutable $now, private bool $dryRun = false) {}
 
@@ -37,22 +38,26 @@ final class AlertJob
 
         foreach ($users as $user) {
             $alerts = Alerts::forUser((int) $user['id'], true);
-            $tz = Alerts::mailTimezone($alerts);
-            $local = $this->now->setTimezone(new DateTimeZone($tz));
-            $hour = (int) $local->format('G');
-            if ($hour < self::SEND_HOUR) {
+            $local = $this->now->setTimezone(new DateTimeZone(MailTime::timezone($user, $alerts)));
+            $date = $local->format('Y-m-d');
+            $late = MailTime::minuteOfDay($local) - MailTime::dueMinute($user);   // minutes past the due time
+            if ($late < 0) {
                 continue;
             }
-            $date = $local->format('Y-m-d');
             if ($user['paused_until'] !== null && $user['paused_until'] >= $date) {
                 continue;
             }
+            if (!$this->dryRun) {
+                // failed attempts from earlier days will not be retried any more
+                App::db()->run("UPDATE mail_runs SET status = 'skipped' WHERE user_id = ? AND status = 'failed' AND local_date < ?",
+                    [$user['id'], $date]);
+            }
             $style = Prefs::style($user['mail_style']);
             if (Prefs::wantsAlerts($style)) {
-                $this->step($user, $alerts, $date, 'alerts', $hour);
+                $this->step($user, $alerts, $date, 'alerts', $late);
             }
             if (Prefs::wantsDigest($style) && (int) $local->format('w') === self::DIGEST_WEEKDAY) {
-                $this->step($user, $alerts, $date, 'digest', $hour);
+                $this->step($user, $alerts, $date, 'digest', $late);
             }
         }
         $this->maybeStatusMail();
@@ -63,7 +68,7 @@ final class AlertJob
         return $this->log;
     }
 
-    private function step(array $user, array $alerts, string $date, string $kind, int $hour): void
+    private function step(array $user, array $alerts, string $date, string $kind, int $late): void
     {
         $db = App::db();
         $run = $db->one('SELECT * FROM mail_runs WHERE user_id = ? AND local_date = ? AND kind = ?',
@@ -72,12 +77,14 @@ final class AlertJob
             return;
         }
         $label = "$kind user {$user['id']} $date";
-        if ($hour >= self::GIVE_UP_HOUR) {
-            $this->record((int) $user['id'], $date, $kind, 'skipped', 0, $run['message'] ?? 'not processed before 20:00');
+        if ($late >= MailTime::RETRY_HOURS * 60) {
+            $this->record((int) $user['id'], $date, $kind, 'skipped', 0,
+                $run['message'] ?? 'not processed within ' . MailTime::RETRY_HOURS . ' hours');
             $this->log[] = "SKIPPED $label";
             return;
         }
         try {
+            $this->announced = [];
             [$sent, $ok] = $kind === 'alerts' ? $this->alerts($user, $alerts) : $this->digest($user, $alerts, $date);
             if (!$ok) {
                 $this->record((int) $user['id'], $date, $kind, 'failed', 0, 'mail could not be sent, see storage/logs/app.log');
@@ -85,6 +92,11 @@ final class AlertJob
                 return;
             }
             $this->record((int) $user['id'], $date, $kind, 'done', $sent, '');
+            if (!$this->dryRun) {
+                foreach ($this->announced as $alertId => $night) {
+                    Alerts::markAnnounced($alertId, $night);
+                }
+            }
             if ($sent) {
                 $this->log[] = "done $label: mail sent";
             }
@@ -100,12 +112,18 @@ final class AlertJob
         $db = App::db();
         $groups = [];
         foreach ($alerts as $a) {
-            $night = Alerts::nightFor($a, $this->now);
-            $events = Prefs::filter($a['prefs'], App::calc()->events((int) $a['city_id'], $night, $night));
+            $nights = Alerts::nightsToAnnounce($a, $this->now);
+            $this->announced[(int) $a['id']] = end($nights);
+            $events = Prefs::filter($a['prefs'], App::calc()->events((int) $a['city_id'], $nights[0], end($nights)));
+            $events = array_values(array_filter($events, static fn ($e) => in_array($e['date'], $nights, true)));
             $found = count($events);
             $events = array_values(array_filter($events, static fn ($e) => !$db->value(
                 'SELECT 1 FROM sent_log WHERE user_id = ? AND event_key = ?', [$user['id'], "a{$a['id']}:{$e['key']}"])));
             if ($events) {
+                foreach ($events as &$e) {
+                    $e['when'] = Alerts::when($a, $e['date'], $this->now);
+                }
+                unset($e);
                 $groups[] = ['alert' => $a, 'events' => $events];
             }
             if (!$this->dryRun && $found) {
@@ -118,7 +136,7 @@ final class AlertJob
         if ($this->dryRun) {
             foreach ($groups as $g) {
                 $this->log[] = "  would send {$user['email']} [" . Alerts::label($g['alert']) . ']: '
-                    . implode(', ', array_column($g['events'], 'key'));
+                    . implode(', ', array_map(static fn ($e) => "{$e['key']} ({$e['when']})", $g['events']));
             }
             return [1, true];
         }
@@ -142,7 +160,8 @@ final class AlertJob
         $calc = App::calc();
         $sections = [];
         foreach ($alerts as $a) {
-            $start = Alerts::nightFor($a, $this->now);
+            $nights = Alerts::nightsToAnnounce($a, $this->now);
+            $start = end($nights);
             $end = (new DateTimeImmutable($start))->modify('+6 days')->format('Y-m-d');
             $sections[] = [
                 'alert'  => $a,

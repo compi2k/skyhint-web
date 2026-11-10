@@ -48,6 +48,15 @@ final class Emails
     public static function alerts(array $user, array $groups): bool
     {
         return self::inLang($user['lang'], function () use ($user, $groups) {
+            // usually every event is for the same night ("tonight" or "tomorrow night");
+            // if not, each event says which night it is about
+            $nights = [];
+            foreach ($groups as $g) {
+                foreach ($g['events'] as $e) {
+                    $nights[$e['when'] . '|' . $e['date']] = true;
+                }
+            }
+            $mixed = count($nights) > 1;
             $titles = [];
             $sections = [];
             foreach ($groups as $g) {
@@ -55,7 +64,9 @@ final class Emails
                 foreach ($g['events'] as $e) {
                     $t = Format::eventTitle($e);
                     $titles[] = $t;
-                    $blocks[] = ['title' => $t, 'lines' => Format::eventLines($e)];
+                    $blocks[] = ['title' => $mixed
+                        ? I18n::t('when.block', ['when' => I18n::t('when.' . $e['when']), 'date' => Format::date($e['date']), 'title' => $t])
+                        : $t, 'lines' => Format::eventLines($e)];
                 }
                 $sections[] = [
                     'title'  => self::placeTitle($g['alert']),
@@ -63,16 +74,21 @@ final class Emails
                     'after'  => [Format::moon($g['events'][0]['moon'])],
                 ];
             }
+            $first = $groups[0]['events'][0];
+            $when = I18n::t('when.' . $first['when']);
             $subject = count($titles) === 1
-                ? I18n::t('mail.alert.subject_one', ['title' => $titles[0]])
-                : I18n::t('mail.alert.subject_many', ['title' => $titles[0], 'n' => count($titles) - 1]);
-            $date = Format::date($groups[0]['events'][0]['date']);
+                ? I18n::t('mail.alert.subject_one', ['when' => $when, 'title' => $titles[0]])
+                : I18n::t('mail.alert.subject_many', ['when' => $when, 'title' => $titles[0], 'n' => count($titles) - 1]);
+            $date = Format::date($first['date']);
             $single = count($groups) === 1;
+            $heading = match (true) {
+                $mixed  => I18n::t('mail.alert.heading_mixed'),
+                $single => I18n::t('mail.alert.heading', ['when' => $when, 'city' => $groups[0]['alert']['city_name'], 'date' => $date]),
+                default => I18n::t('mail.alert.heading_many', ['when' => $when, 'date' => $date, 'n' => count($groups)]),
+            };
             return self::deliver($user['email'], [
                 'subject'  => $subject,
-                'heading'  => $single
-                    ? I18n::t('mail.alert.heading', ['city' => $groups[0]['alert']['city_name'], 'date' => $date])
-                    : I18n::t('mail.alert.heading_many', ['date' => $date, 'n' => count($groups)]),
+                'heading'  => $heading,
                 'sections' => $single ? [['title' => '', 'blocks' => $sections[0]['blocks'], 'after' => $sections[0]['after']]] : $sections,
                 'after'    => [I18n::t('mail.alert.weather')],
             ], $user);

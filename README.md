@@ -1,7 +1,7 @@
 # Skyhint.app
 
-**Know when to look up.** Skyhint.app sends you a short mail on the afternoon
-before a night when a planet is worth stepping outside for: Venus back in the
+**Know when to look up.** Skyhint.app sends you a short mail ahead of a
+night when a planet is worth stepping outside for: Venus back in the
 evening sky, Mars at its brightest, Jupiter and Saturn side by side, a rare
 window for Mercury. It is calculated for your city, is free, and needs no app.
 
@@ -21,9 +21,12 @@ API. The sky calculations run on a separate small server, see
   constellations. Drag through the night or press play; turn left and right.
   "Show in the sky" on each planet card jumps to its best moment.
 - **Mail alerts.** Up to 10 places per account, each with its own planets and
-  event types. Everything for one day goes out in a single mail at 15:00 local
-  time. Optional weekly overview on Sundays. Pause, test mail and one-click
-  unsubscribe.
+  event types. Everything for one day goes out in a single mail, in a time
+  slot the user picks (morning, midday, afternoon or evening, in any time
+  zone). The mail always announces the next night that hasn't started yet at
+  each place, so it is never too late, even for places on the other side of
+  the world. Optional weekly overview on Sundays. Pause, test mail and
+  one-click unsubscribe.
 - **Calendar feed and API.** A free API key (confirmed email required) gives
   JSON endpoints and an iCal feed of your alerts.
 - **City of the week** on the start page, prepared ahead of time so the start
@@ -33,7 +36,9 @@ API. The sky calculations run on a separate small server, see
 - **German and English**, each in one file; adding a language means copying
   one file.
 - **Privacy:** stores an email address, cities and settings, nothing else. No
-  tracking, no third-party scripts, no ads.
+  third-party scripts, no ads, no tracking by default. Optional visitor
+  statistics with your own Matomo server, without cookies, with an opt-out
+  and its own section on the privacy page.
 
 ## Screenshots
 
@@ -64,7 +69,7 @@ API. The sky calculations run on a separate small server, see
 - Calc results are deterministic, so the web app caches them in the database
   for days. Pages that need fresh calculations show a friendly error if the
   calc server is down; the start page and status page keep working, and the
-  mail job retries until 20:00 local time.
+  mail job keeps retrying for five hours.
 - Plain PHP with no framework and no Composer: PHPMailer is bundled in
   `vendor/`. No build step, no Node. Upload and go.
 
@@ -144,7 +149,8 @@ Shared hosting with SSH works fine; it was built for a KeyHelp server.
    php bin/send-alerts.php --dry-run --now="2026-11-10 14:05"
    ```
 
-10. **Legal pages.** Fill in the `imprint` section of the config for `/imprint`
+10. **Legal pages.** Fill in the `imprint` section of the config for the legal notice
+    (`/impressum`, `/legal-notice`)
     and read `/privacy`. Two statements there depend on how you run the server:
     backups rolling over within 30 days (`privacy.delete_text` in `lang/*.php`)
     and the contact address (`imprint.email`).
@@ -184,7 +190,9 @@ repository. The important keys:
 | `db.*` | Database connection |
 | `mail.*` | Sender and SMTP login (`transport` `smtp` or `mail`) |
 | `calc.url`, `calc.secret`, `calc.timeout` | The calc service and its `CALC_SECRET` |
-| `imprint.*` | Name, address and contact for `/imprint` and `/privacy` |
+| `banner.text`, `banner.style`, `banner.link` | Optional banner across the top of every page, e.g. "Prototype under construction"; text per language or one for all; styles `info`, `warning`, `danger`, `construction` |
+| `matomo.url`, `matomo.site_id`, `matomo.retention_days` | Optional visitor statistics, see [Visitor statistics](#visitor-statistics-optional) |
+| `imprint.*` | Name, address and contact for the legal notice and `/privacy` |
 
 ## Update
 
@@ -215,12 +223,26 @@ No code or database changes needed.
 
 `bin/send-alerts.php` runs every 15 minutes and, per account:
 
-- once it is 15:00 in the time zone of the account's first enabled place, it
-  checks tonight for every enabled place and sends **one** mail with a section
-  per place;
+- once the account's mail time has come, it checks every enabled place and
+  sends **one** mail with a section per place;
 - on Sundays it does the same for the weekly overview (if chosen);
-- if the calc server is down, later runs retry until 20:00 local time, then
-  the day is skipped and shows up in the owner's status mail.
+- if the calc server or the mail server fails, later runs retry for five
+  hours, then the day is skipped and shows up in the owner's status mail.
+
+**Mail time.** Each account picks a slot (`morning` 7–9, `midday` 12–14,
+`afternoon` 15–17, the default, or `evening` 19–21) in a time zone of its
+choice (preset from the signup city). Within the slot, every account gets a
+fixed minute derived from its ID, so the mail server never sends everything at
+once. Slots and the retry time are constants in `src/MailTime.php`.
+
+**Which night.** For each place, the mail announces the next night whose
+darkness hasn't begun there yet: "tonight" before dusk, "tomorrow night"
+after. A Berlin user watching Sydney gets Sydney's coming night, not the one
+that is half over. Each place remembers the newest night announced
+(`alerts.last_night`); if the mail time drifts past dusk (daylight saving,
+shorter days), the skipped night is added while it is still running, so no
+night falls through the gap. A six-month simulation across both clock
+changes, polar night and three continents found no gaps.
 
 Every event is logged per place (`sent_log`), so nothing is ever sent twice,
 and every run is recorded per account and day (`mail_runs`).
@@ -276,6 +298,29 @@ php bin/check-lang.php          # reports missing strings and placeholders
 
 Mails go out in each account's chosen language.
 
+### Visitor statistics (optional)
+
+With your own [Matomo](https://matomo.org) server, set `matomo.url` and
+`matomo.site_id` in the config. Then:
+
+- the tracker runs without cookies and without reading screen size or
+  plugins (`disableBrowserFeatureDetection`);
+- only the path of a page is sent, never its query string, because links in
+  mails carry tokens there;
+- visitors with Do Not Track or Global Privacy Control, or without
+  JavaScript, are not counted;
+- the privacy page gets a section on what is collected, with a switch to opt
+  out (remembered in the browser's local storage, not a cookie);
+- the Content-Security-Policy allows your Matomo server and nothing else.
+
+In Matomo itself, set *Privacy → Anonymize data* to mask 2 bytes of the IP,
+and delete old raw data after the same number of days as
+`matomo.retention_days`; the privacy page states both. Whether you need
+consent for this depends on your country; this setup follows common practice
+for consent-free, cookieless analytics in the EU, but it is not legal advice.
+Without `matomo.url`, nothing is loaded and the privacy page says there is no
+tracking.
+
 ## Public API
 
 Free, with a key from the account page (confirmed email required). Full docs
@@ -287,7 +332,7 @@ on the site at `/api`.
 | `GET /api/v1/sky/tonight?city=` | Darkness, Moon, and when and where each planet is visible |
 | `GET /api/v1/events?city=&from=&to=&types=` | Events between two dates (default: next 90 nights) |
 | `GET /api/v1/events.ics?key=` | Calendar feed of your enabled places (key in the URL for calendar apps) |
-| `GET`, `PATCH /api/v1/me` | Your account: mail style, language, mails on/off |
+| `GET`, `PATCH /api/v1/me` | Your account: mail style, language, mails on/off, `mail_slot`, `mail_tz` |
 | `GET`, `POST /api/v1/alerts` | Your places (up to 10) |
 | `GET`, `PATCH`, `DELETE /api/v1/alerts/{id}` | One place |
 

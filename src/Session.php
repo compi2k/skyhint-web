@@ -22,10 +22,16 @@ final class Session
         ini_set('session.use_strict_mode', '1');
         ini_set('session.gc_maxlifetime', '86400');
         session_start();
-        // expire idle logins after 30 days of inactivity is handled by gc; absolute
-        // lifetime for logged-in sessions: 30 days
-        if (isset($_SESSION['login_at']) && time() - $_SESSION['login_at'] > 30 * 86400) {
-            self::logout();
+        // The cookie has no expiry date: closing the browser ends the login. On the
+        // server a login also ends after 24 hours without activity, and after 30 days
+        // at most (the privacy page says so).
+        if (isset($_SESSION['login_at'])) {
+            $idle = time() - (int) ($_SESSION['seen_at'] ?? $_SESSION['login_at']);
+            if ($idle > 86400 || time() - $_SESSION['login_at'] > 30 * 86400) {
+                self::logout();
+            } else {
+                $_SESSION['seen_at'] = time();
+            }
         }
     }
 
