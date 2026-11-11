@@ -26,8 +26,8 @@ foreach ($rows as $r) {
     $summary[] = t('planet.' . $r['name']) . ': ' . ($parts ? t('planner.good', ['spans' => implode(', ', $parts)])
         : t('planner.not_good')) . ($r['best'] !== null ? ' ' . t('planner.best', ['time' => $times[$r['best']]]) : '');
 }
-$draw = static function (int $W, int $x0, int $hourEvery, string $class) use ($rows, $times, $sun, $n, $shade, $summary, $sky): string {
-$x1 = $W - 16; $top = 30; $rowH = 34;
+$draw = static function (int $W, int $x0, int $hourEvery, string $class, int $rowH = 34) use ($rows, $times, $sun, $n, $shade, $summary, $sky): string {
+$x1 = $W - 16; $top = 28; $bar = $rowH >= 30 ? 14 : 10;
 $H = $top + max(1, count($rows)) * $rowH + 10;
 $X = static fn (float $i) => $x0 + ($n > 1 ? $i / ($n - 1) : 0) * ($x1 - $x0);
 $step = ($x1 - $x0) / max(1, $n - 1);
@@ -51,10 +51,10 @@ ob_start();
           <line class="pl-up" x1="<?= round($X($a), 1) ?>" x2="<?= round($X($b), 1) ?>" y1="<?= $y ?>" y2="<?= $y ?>"/>
         <?php endforeach; ?>
         <?php foreach ($r['good'] as [$a, $b]): ?>
-          <rect class="pl-good" x="<?= round($X($a), 1) ?>" y="<?= $y - 7 ?>" width="<?= round(max(3, $X($b) - $X($a)), 1) ?>" height="14" rx="7"/>
+          <rect class="pl-good" x="<?= round($X($a), 1) ?>" y="<?= $y - $bar / 2 ?>" width="<?= round(max(3, $X($b) - $X($a)), 1) ?>" height="<?= $bar ?>" rx="<?= $bar / 2 ?>"/>
         <?php endforeach; ?>
         <?php if ($r['best'] !== null): ?>
-          <circle class="pl-best" cx="<?= round($X($r['best']), 1) ?>" cy="<?= $y ?>" r="5.5"/>
+          <circle class="pl-best" cx="<?= round($X($r['best']), 1) ?>" cy="<?= $y ?>" r="<?= $bar >= 14 ? 5.5 : 4.5 ?>"/>
         <?php endif; ?>
       </g>
     <?php endforeach; ?>
@@ -68,6 +68,6 @@ return (string) ob_get_clean();
 };
 ?>
 <figure class="planner">
-  <?= $draw(640, 84, 1, 'planner-wide') ?>
+  <?= $draw(640, 84, 1, 'planner-wide', 24) ?>
   <?= $draw(400, 74, 2, 'planner-narrow') ?>
 </figure>

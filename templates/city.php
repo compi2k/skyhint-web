@@ -11,27 +11,40 @@ $south = (float) $city['latitude'] < 0;
 ?>
 <section class="hero hero-city">
   <div class="hero-text wrap">
+    <p class="eyebrow mono"><span class="eyebrow-dot" aria-hidden="true"></span><?= e(Format::coords((float) $city['latitude'], (float) $city['longitude'])) ?> · <?= e(Format::date($night['date'])) ?></p>
     <h1><?= e(t('city.heading', ['city' => $city['name']])) ?></h1>
-    <p class="lead">
-      <?= e(Cities::label($city)) ?><br>
-      <?php if ($night['dark']): ?>
-        <?= e(t('city.dark', ['date' => Format::date($night['date']),
-                               'start' => Format::time($night['dark'][0]['start']),
-                               'end' => Format::time($night['dark'][count($night['dark']) - 1]['end'])])) ?>
-      <?php else: ?>
-        <?= e(t('city.no_dark', ['date' => Format::date($night['date'])])) ?>
-      <?php endif; ?>
-    </p>
+    <p class="lead"><?= e(Cities::label($city)) ?></p>
   </div>
 </section>
+
+<?php
+$dark = $night['dark'] ? [$night['dark'][0]['start'], $night['dark'][count($night['dark']) - 1]['end']] : null;
+$first = $events[0] ?? null;
+$bestPlanet = null;
+foreach ($visible as $name => $p) {
+    if ($bestPlanet === null || $p['best']['altitude'] > $visible[$bestPlanet]['best']['altitude']) {
+        $bestPlanet = $name;
+    }
+}
+?>
+<div class="wrap">
+  <?= View::partial('partials/glance', [
+      'dark'    => $dark,
+      'moon'    => (int) round(($night['moon']['illumination'] ?? 0) * 100),
+      'waxing'  => str_starts_with((string) ($night['moon']['phase'] ?? ''), 'wax') || ($night['moon']['phase'] ?? '') === 'first_quarter',
+      'visible' => array_keys($visible),
+      'best'    => $bestPlanet ? ['name' => $bestPlanet, 'time' => $visible[$bestPlanet]['best']['time']] : null,
+      'next'    => $first ? ['date' => $first['date'], 'title' => Format::eventTitle($first)] : null,
+  ]) ?>
+</div>
 
 <div class="city-layout wrap">
   <section class="city-cards">
     <h2><?= e($visible ? t('find.title', ['n' => count($visible)]) : t('city.none_title')) ?></h2>
     <?php if ($visible): ?>
       <div class="findcards">
-        <?php foreach ($visible as $name => $p): ?>
-          <?= View::partial('partials/findcard', ['planet' => $name, 'vis' => $p, 'south' => $south]) ?>
+        <?php $i = 0; foreach ($visible as $name => $p): ?>
+          <?= View::partial('partials/findcard', ['planet' => $name, 'vis' => $p, 'south' => $south, 'open' => $i++ === 0]) ?>
         <?php endforeach; ?>
       </div>
       <p class="quiet"><?= e(t('find.twinkle')) ?></p>

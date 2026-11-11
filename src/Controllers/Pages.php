@@ -33,6 +33,7 @@ final class Pages
             'title' => App::name(),
             'week'  => $week ? $week['city'] : null,
             'sky'   => $week ? SkyTrack::prepare($week['track'], $week['city']) : null,
+            'glance' => $week ? SkyTrack::glance($week['track']) : null,
         ];
     }
 

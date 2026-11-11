@@ -122,6 +122,13 @@ final class AlertJob
             if ($events) {
                 foreach ($events as &$e) {
                     $e['when'] = Alerts::when($a, $e['date'], $this->now);
+                    $e['shown_date'] = $e['date'];
+                    // a morning-sky event of the night starting on day D happens on the morning of D+1:
+                    // say "tomorrow morning, Thu 12 Nov" rather than "tonight, Wed 11 Nov"
+                    if (Format::skyPart($e['visibility'][$e['planets'][0]] ?? []) === 'morning') {
+                        $e['when'] = $e['when'] === 'tonight' ? 'morning_tomorrow' : 'morning_after';
+                        $e['shown_date'] = (new DateTimeImmutable($e['date']))->modify('+1 day')->format('Y-m-d');
+                    }
                 }
                 unset($e);
                 $groups[] = ['alert' => $a, 'events' => $events];

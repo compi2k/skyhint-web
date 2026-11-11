@@ -1,4 +1,5 @@
-// Sky view for the city page and the start page: what you see facing one direction, at one moment of the night.
+// Sky view for the city page and the start page, in two forms: the horizon view (what you see facing
+// one direction) and the sky chart (looking straight up, the whole sky at once), both at one moment of the night.
 // Planets and the Moon come from the night track (#sky-data); bright stars and constellations
 // are computed here from their fixed positions, so they need no data from the server.
 (function () {
@@ -137,7 +138,10 @@
   }
 
   // ---- state ----
-  var facing = 180, manual = false, index = +range.value, timer = null, focus = null;
+  var facing = 180, manual = false, index = +range.value, timer = null, focus = null, mode = 'horizon';
+  var turnRow = view.querySelector('.skyview-turn');
+  var chartHint = view.querySelector('[data-chart-hint]');
+  var views = document.querySelector('[data-sky-views]');
 
   function bodiesAt(i) {
     var list = [];
@@ -165,12 +169,132 @@
   }
 
   function draw() {
-    var i = index;
+    if (mode === 'chart') drawChart(index); else drawHorizon(index);
+    if (turnRow) turnRow.hidden = mode === 'chart';
+    if (chartHint) chartHint.hidden = mode !== 'chart';
+    info(index);
+    // the panel stays beside the cards while scrolling, but only if it fits on the screen
+    var pin = view.closest('.city-night');
+    if (pin) pin.classList.toggle('is-tall', pin.offsetHeight > (window.innerHeight || 800) - 24);
+  }
+
+  // ---- the sky chart: looking straight up, the edge is the horizon ----
+  function drawChart(i) {
+    var w = Math.max(280, Math.round(stage.clientWidth || 600));
+    var size = Math.min(w, 380, Math.max(260, Math.round((window.innerHeight || 800) * 0.42)));
+    var narrow = w < 520;
+    var cx = w / 2, cy = size / 2, R = size / 2 - 24;
+    var flip = D.lat < 0 ? -1 : 1;          // south of the equator, hold the chart with north at the bottom
+    var P = function (alt, az) {
+      var r = R * (90 - Math.max(0, Math.min(90, alt))) / 90, a = az * RAD;
+      return [cx - flip * r * Math.sin(a), cy - flip * r * Math.cos(a)];
+    };
+    var sunAlt = D.sun[i], sunAz = D.sun[i] !== undefined ? D.sunAz[i] : 270;
+    var cols = skyColours(sunAlt), when = new Date(D.iso[i]);
+    var svg = el('svg', { viewBox: '0 0 ' + w + ' ' + size, width: w, height: size });
+    var defs = el('defs');
+    var g1 = el('radialGradient', { id: 'sc-sky', cx: '50%', cy: '50%', r: '50%' });
+    g1.appendChild(el('stop', { offset: 0, 'stop-color': rgb(cols[0]) }));
+    g1.appendChild(el('stop', { offset: 1, 'stop-color': rgb(mix(cols[0], cols[1], 0.55)) }));
+    defs.appendChild(g1);
+    var sp = P(0, sunAz), glow = Math.max(0, Math.min(1, (sunAlt + 16) / 16)) * 0.65;
+    var g2 = el('radialGradient', { id: 'sc-glow', gradientUnits: 'userSpaceOnUse', cx: sp[0].toFixed(1), cy: sp[1].toFixed(1), r: (R * 1.1).toFixed(1) });
+    g2.appendChild(el('stop', { offset: 0, 'stop-color': '#F0A878', 'stop-opacity': glow }));
+    g2.appendChild(el('stop', { offset: 1, 'stop-color': '#F0A878', 'stop-opacity': 0 }));
+    defs.appendChild(g2);
+    var clip = el('clipPath', { id: 'sc-clip' });
+    clip.appendChild(el('circle', { cx: cx, cy: cy, r: R }));
+    defs.appendChild(clip);
+    svg.appendChild(defs);
+    svg.appendChild(el('circle', { 'class': 'sv-chart-bg', cx: cx, cy: cy, r: R, fill: 'url(#sc-sky)' }));
+    if (glow > 0.01) svg.appendChild(el('circle', { cx: cx, cy: cy, r: R, fill: 'url(#sc-glow)', 'clip-path': 'url(#sc-clip)' }));
+    [30, 60].forEach(function (a) {
+      svg.appendChild(el('circle', { 'class': 'sv-chart-ring', cx: cx, cy: cy, r: (R * (90 - a) / 90).toFixed(1) }));
+      svg.appendChild(el('text', { 'class': 'sv-chart-alt', x: (cx + 4).toFixed(1), y: (cy - R * (90 - a) / 90 - 4).toFixed(1) }, a + '°'));
+    });
+    svg.appendChild(el('path', { 'class': 'sv-chart-axis', d: 'M' + cx + ' ' + (cy - R) + 'V' + (cy + R) + 'M' + (cx - R) + ' ' + cy + 'H' + (cx + R) }));
+    for (var c = 0; c < 360; c += 45) {
+      var q = P(-14, c), major = c % 90 === 0;
+      if (!major && narrow) continue;
+      svg.appendChild(el('text', { 'class': 'sv-dir' + (major ? ' is-facing' : ''), x: q[0].toFixed(1), y: (q[1] + 4).toFixed(1), 'text-anchor': 'middle' },
+        major ? L.dir[DIRS[c / 45]] : L.dir[DIRS[c / 45]]));
+    }
+
+    var bodies = bodiesAt(i).map(function (b) { var p = P(b.alt, b.az); b.x = p[0]; b.y = p[1]; return b; });
+    var nearPlanet = function (x, y) { return bodies.some(function (b) { return Math.abs(b.x - x) < 70 && Math.abs(b.y - y) < 26; }); };
+    var starAlpha = Math.max(0, Math.min(1, (-sunAlt - 5) / 9));
+    if (starAlpha > 0) {
+      var pos = {};
+      STARS.forEach(function (st) { var p = starHorizon(st[1], st[2], when); p.mag = st[3]; pos[st[0]] = p; });
+      var gl = el('g', { 'class': 'sv-figures', opacity: starAlpha });
+      Object.keys(FIGURES).forEach(function (fig) {
+        var pts = [];
+        FIGURES[fig].forEach(function (line) {
+          for (var k = 1; k < line.length; k++) {
+            var a = pos[line[k - 1]], b = pos[line[k]];
+            if (a.alt > 0 && b.alt > 0) {
+              var pa = P(a.alt, a.az), pb = P(b.alt, b.az);
+              gl.appendChild(el('line', { x1: pa[0].toFixed(1), y1: pa[1].toFixed(1), x2: pb[0].toFixed(1), y2: pb[1].toFixed(1) }));
+            }
+          }
+          line.forEach(function (id) { if (pos[id].alt > 3) pts.push(P(pos[id].alt, pos[id].az)); });
+        });
+        if (pts.length >= Math.min(2, FIGURES[fig][0].length)) {
+          var mx = pts.reduce(function (t, p) { return t + p[0]; }, 0) / pts.length;
+          var my = Math.max.apply(null, pts.map(function (p) { return p[1]; })) + 16;
+          if (!nearPlanet(mx, my) && Math.hypot(mx - cx, my - cy) < R - 8) {
+            gl.appendChild(el('text', { 'class': 'sv-const', x: mx.toFixed(1), y: my.toFixed(1), 'text-anchor': 'middle' }, L.const[fig]));
+          }
+        }
+      });
+      svg.appendChild(gl);
+      var gs = el('g', { 'class': 'sv-stars', opacity: starAlpha });
+      STARS.forEach(function (st) {
+        var p = pos[st[0]];
+        if (p.alt <= 0) return;
+        var xy = P(p.alt, p.az), r = Math.max(1, 3 - 0.55 * p.mag) * (narrow ? 0.85 : 1);
+        if (p.mag < 1) gs.appendChild(el('circle', { 'class': 'glow', cx: xy[0].toFixed(1), cy: xy[1].toFixed(1), r: (r * 2.6).toFixed(1) }));
+        gs.appendChild(el('circle', { cx: xy[0].toFixed(1), cy: xy[1].toFixed(1), r: r.toFixed(2) }));
+        if (L.star[st[0]] && p.mag < 1 && !narrow && !nearPlanet(xy[0], xy[1])) {
+          gs.appendChild(el('text', { 'class': 'sv-star-name', x: (xy[0] + r + 4).toFixed(1), y: (xy[1] + 4).toFixed(1) }, L.star[st[0]]));
+        }
+      });
+      svg.appendChild(gs);
+    }
+
+    // planets and the Moon with labels that keep out of each other's way
+    var placed = bodies.map(function (b) { var r = b.name === 'moon' ? 11 : 8; return [b.x - r, b.y - r, b.x + r, b.y + r]; });
+    var bright = sunAlt > -6;
+    bodies.slice().sort(function (a, b) { return b.alt - a.alt; }).forEach(function (p) {
+      var text = L.planet[p.name], tw = text.length * 8.4, r = p.name === 'moon' ? 11 : 7;
+      var opts = [[p.x + r + 6, p.y + 5, 'start'], [p.x - r - 6, p.y + 5, 'end'], [p.x, p.y - r - 7, 'middle'], [p.x, p.y + r + 17, 'middle']];
+      p.label = opts[0];
+      for (var k = 0; k < opts.length; k++) {
+        var o = opts[k], x0 = o[2] === 'middle' ? o[0] - tw / 2 : (o[2] === 'start' ? o[0] : o[0] - tw);
+        var bx = [x0, o[1] - 14, x0 + tw, o[1] + 3];
+        if (bx[0] < 2 || bx[2] > w - 2) continue;
+        if (!placed.some(function (q) { return bx[0] < q[2] + 3 && bx[2] > q[0] - 3 && bx[1] < q[3] + 2 && bx[3] > q[1] - 2; })) { p.label = o; placed.push(bx); break; }
+      }
+      var faint = p.name !== 'moon' && (p.alt < (MIN_ALT[p.name] || 10) || (bright && p.mag > -1));
+      var g = el('g', { 'class': 'sv-planet planet-' + p.name + (faint ? ' is-faint' : '') });
+      if (p.name === focus) g.appendChild(el('circle', { 'class': 'sv-focus', cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 18 }));
+      if (p.name === 'moon') g.appendChild(moonShape(p.x, p.y, 10, D.bodies.moon.illumination, D.bodies.moon.waxing));
+      else {
+        g.appendChild(el('circle', { 'class': 'halo', cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 12 }));
+        g.appendChild(el('circle', { cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 5.5 }));
+      }
+      g.appendChild(el('text', { x: p.label[0].toFixed(1), y: p.label[1].toFixed(1), 'text-anchor': p.label[2] }, text));
+      svg.appendChild(g);
+    });
+    stage.replaceChildren(svg);
+  }
+
+  function drawHorizon(i) {
     // drawn at the real size of the stage, so text and dots keep their size on any screen
     var w = Math.max(280, Math.round(stage.clientWidth || 800));
     var narrow = w < 520;
-    var maxH = Math.max(240, Math.round((window.innerHeight || 800) * (narrow ? 0.6 : 0.5)));
-    var h = Math.min(narrow ? Math.round(w * 0.82) : Math.max(260, Math.round(w * 0.45)), maxH, 470);
+    var maxH = Math.max(220, Math.round((window.innerHeight || 800) * (narrow ? 0.5 : 0.36)));
+    var h = Math.min(narrow ? Math.round(w * 0.72) : Math.max(220, Math.round(w * 0.36)), maxH, 360);
     var fov = Math.max(90, Math.min(130, Math.round(w / h * 45 / 5) * 5));
     if (!manual) facing = bestFacing(i, fov);
     var horizon = h - 34, top = 14;
@@ -307,9 +431,12 @@
       svg.appendChild(el('text', { 'class': 'sv-dir' + (c === facing ? ' is-facing' : ''), x: X(c).toFixed(1), y: h - 10, 'text-anchor': 'middle' }, L.dir[DIRS[c / 45]]));
     }
     stage.replaceChildren(svg);
-
     if (facingEl) facingEl.textContent = L.text.facing.replace('{dir}', L.dirLong[DIRS[facing / 45]]);
+  }
 
+  // the sentence, the time and the planner cursor: the same for both views
+  function info(i) {
+    var sunAlt = D.sun[i];
     // the sentence: what is up right now, wherever it is
     var all = bodiesAt(i);
     var items = all.map(function (p) {
@@ -354,6 +481,33 @@
       if (r.top < 0 || r.bottom > window.innerHeight) {
         view.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
       }
+    });
+  });
+  // horizon view or sky chart
+  if (views) {
+    var vb = views.querySelectorAll('[data-view]');
+    views.hidden = false;
+    vb.forEach(function (b) {
+      b.addEventListener('click', function () {
+        mode = b.dataset.view;
+        vb.forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        draw();
+      });
+    });
+  }
+  // opening a planet row puts that planet in focus at its best moment (without scrolling away)
+  document.querySelectorAll('details[data-planet]').forEach(function (d) {
+    var byUser = false;   // the row that starts open must not move the view on load
+    d.querySelector('summary').addEventListener('click', function () { byUser = true; });
+    d.addEventListener('toggle', function () {
+      var name = d.dataset.planet, i = D.best && D.best[name];
+      if (!byUser) return;
+      byUser = false;
+      if (!d.open || i === undefined || !D.bodies[name]) return;
+      document.querySelectorAll('details[data-planet]').forEach(function (o) { if (o !== d) o.open = false; });
+      stop(); manual = true; focus = name;
+      facing = (Math.round(D.bodies[name].az[i] / 45) * 45) % 360;
+      setIndex(i);
     });
   });
   play.addEventListener('click', function () {

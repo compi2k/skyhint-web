@@ -98,6 +98,37 @@ final class SkyTrack
         return $rows;
     }
 
+    /**
+     * "Tonight at a glance" from a track: darkness, Moon, visible planets and
+     * the best moment (the visible planet standing highest at its best time).
+     * @return array{dark: ?array{0:string,1:string}, moon: ?int, waxing: bool, visible: list<string>, best: ?array{name:string,time:string}}
+     */
+    public static function glance(array $track): array
+    {
+        $times = $track['times'];
+        $dark = array_keys(array_filter($track['sun'], static fn ($alt) => $alt <= -6));
+        $visible = [];
+        $best = null;
+        foreach (self::plannerRows($track) as $row) {
+            if ($row['name'] === 'moon' || !$row['good'] || $row['best'] === null) {
+                continue;
+            }
+            $visible[] = $row['name'];
+            $alt = $track['bodies'][$row['name']]['alt'][$row['best']];
+            if ($best === null || $alt > $best['alt']) {
+                $best = ['name' => $row['name'], 'time' => $times[$row['best']], 'alt' => $alt];
+            }
+        }
+        $moon = $track['bodies']['moon'] ?? [];
+        return [
+            'dark'    => $dark ? [$times[$dark[0]], $times[end($dark)]] : null,
+            'moon'    => isset($moon['illumination']) ? (int) round($moon['illumination'] * 100) : null,
+            'waxing'  => (bool) ($moon['waxing'] ?? true),
+            'visible' => $visible,
+            'best'    => $best,
+        ];
+    }
+
     /** [[from, to], ...] index ranges where the flags are true. */
     private static function runs(array $flags): array
     {

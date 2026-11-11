@@ -148,4 +148,17 @@ final class Format
         $s = number_format($deg, 1, I18n::lang() === 'de' ? ',' : '.', '');
         return $s . '°';
     }
+
+    /** "45.76° N · 4.84° E" */
+    public static function coords(float $lat, float $lon): string
+    {
+        return sprintf('%s° %s · %s° %s',
+            self::num(abs($lat), 2), I18n::t($lat >= 0 ? 'dir.short.N' : 'dir.short.S'),
+            self::num(abs($lon), 2), I18n::t($lon >= 0 ? 'dir.short.E' : 'dir.short.W'));
+    }
+
+    private static function num(float $v, int $dec): string
+    {
+        return number_format($v, $dec, I18n::lang() === 'de' ? ',' : '.', '');
+    }
 }

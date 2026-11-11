@@ -10,11 +10,20 @@
 use PlanetAlerts\View;
 ?>
 <section class="night-panel" aria-labelledby="night-title">
-  <h2 id="night-title"><?= e($heading) ?></h2>
-  <?php if (!empty($lead)): ?><p class="night-lead"><?= e($lead) ?></p><?php endif; ?>
+  <div class="night-head">
+    <div>
+      <h2 id="night-title"><?= e($heading) ?></h2>
+      <?php if (!empty($lead)): ?><p class="night-lead"><?= e($lead) ?></p><?php endif; ?>
+    </div>
+    <div class="view-toggle" role="group" aria-label="<?= e(t('sky.view.label')) ?>" data-sky-views hidden>
+      <button type="button" data-view="horizon" aria-pressed="true"><?= e(t('sky.view.horizon')) ?></button>
+      <button type="button" data-view="chart" aria-pressed="false"><?= e(t('sky.view.chart')) ?></button>
+    </div>
+  </div>
 
   <div class="skyview" data-sky hidden>
     <div class="skyview-stage" aria-hidden="true"></div>
+    <p class="chart-hint" data-chart-hint hidden><?= e(t('sky.chart.hint')) ?></p>
     <div class="skyview-turn">
       <button type="button" class="turn" data-turn="-45" aria-label="<?= e(t('night.turn_left')) ?>">‹</button>
       <p class="facing" aria-live="polite"></p>

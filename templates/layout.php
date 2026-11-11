@@ -9,8 +9,14 @@ use PlanetAlerts\I18n;
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($title === App::name() ? $title : $title . ' – ' . App::name()) ?></title>
   <meta name="description" content="<?= e(t('meta.description')) ?>">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0B1130" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F4F5FA" media="(prefers-color-scheme: light)">
   <link rel="icon" href="<?= e(asset('icon.svg')) ?>" type="image/svg+xml">
+  <link rel="preload" href="<?= e(asset('fonts/inter-latin-wght-normal.woff2')) ?>" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="<?= e(asset('fonts/space-grotesk-latin-wght-normal.woff2')) ?>" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="<?= e(asset('style.css')) ?>">
+  <script src="<?= e(asset('night.js')) ?>"></script>
   <script src="<?= e(asset('app.js')) ?>" defer></script>
   <?php if (\PlanetAlerts\Matomo::enabled()): ?>
   <script src="<?= e(asset('stats.js')) ?>" data-url="<?= e(\PlanetAlerts\Matomo::url()) ?>" data-site="<?= \PlanetAlerts\Matomo::siteId() ?>" defer></script>
@@ -25,7 +31,7 @@ use PlanetAlerts\I18n;
     </div>
   <?php endif; ?>
   <header class="site-header">
-    <a class="brand" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 17h20"/><circle cx="16" cy="10" r="2.5"/></svg><?= e(App::name()) ?></a>
+    <a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="logo-ring" cx="32" cy="32" r="22"/><path class="logo-ring" d="M32 3v8M32 53v8M3 32h8M53 32h8"/><circle class="logo-planet" cx="32" cy="32" r="10"/><ellipse class="logo-orbit" cx="32" cy="32" rx="17" ry="5" transform="rotate(-20 32 32)"/></svg><?= e(App::name()) ?></a>
     <nav aria-label="<?= e(t('nav.label')) ?>">
       <?php if ($user): ?>
         <a href="/alerts"><?= e(t('nav.dashboard')) ?></a>
@@ -45,6 +51,8 @@ use PlanetAlerts\I18n;
         </select>
         <button type="submit" class="small" data-lang-apply><?= e(t('lang.apply')) ?></button>
       </form>
+      <button type="button" class="night-toggle" data-night-toggle aria-pressed="false" aria-label="<?= e(t('nav.night')) ?>" title="<?= e(t('nav.night')) ?>" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
     </nav>
   </header>
 
@@ -56,7 +64,7 @@ use PlanetAlerts\I18n;
   </main>
 
   <footer class="site-footer">
-    <p>
+    <p class="footer-links">
       <a href="/privacy"><?= e(t('nav.privacy')) ?></a>
       <a href="<?= e(t('nav.imprint_url')) ?>"><?= e(t('nav.imprint')) ?></a>
       <a href="/api"><?= e(t('nav.api')) ?></a>

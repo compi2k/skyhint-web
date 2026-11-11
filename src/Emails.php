@@ -53,7 +53,7 @@ final class Emails
             $nights = [];
             foreach ($groups as $g) {
                 foreach ($g['events'] as $e) {
-                    $nights[$e['when'] . '|' . $e['date']] = true;
+                    $nights[$e['when'] . '|' . ($e['shown_date'] ?? $e['date'])] = true;
                 }
             }
             $mixed = count($nights) > 1;
@@ -65,7 +65,7 @@ final class Emails
                     $t = Format::eventTitle($e);
                     $titles[] = $t;
                     $blocks[] = ['title' => $mixed
-                        ? I18n::t('when.block', ['when' => I18n::t('when.' . $e['when']), 'date' => Format::date($e['date']), 'title' => $t])
+                        ? I18n::t('when.block', ['when' => I18n::t('when.' . $e['when']), 'date' => Format::date($e['shown_date'] ?? $e['date']), 'title' => $t])
                         : $t, 'lines' => Format::eventLines($e)];
                 }
                 $sections[] = [
@@ -79,7 +79,7 @@ final class Emails
             $subject = count($titles) === 1
                 ? I18n::t('mail.alert.subject_one', ['when' => $when, 'title' => $titles[0]])
                 : I18n::t('mail.alert.subject_many', ['when' => $when, 'title' => $titles[0], 'n' => count($titles) - 1]);
-            $date = Format::date($first['date']);
+            $date = Format::date($first['shown_date'] ?? $first['date']);
             $single = count($groups) === 1;
             $heading = match (true) {
                 $mixed  => I18n::t('mail.alert.heading_mixed'),

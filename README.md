@@ -9,17 +9,23 @@ This repository is the website: pages, accounts, the mail job and the public
 API. The sky calculations run on a separate small server, see
 **[skyhint-calc](https://github.com/compi2k/skyhint-calc)**.
 
-![Start page with the city of the week, its sky view and night planner](docs/screenshots/home.png)
+![Start page: “3 planets tonight”, the city of the week with its sky view and night planner](docs/screenshots/home.png)
 
 ## Features
 
 - **City pages for anywhere on Earth.** Tonight's sky for any of about 70,000
   cities: which planets you can see, when, in which direction and how high,
   in plain words ("face south and look about four fists up").
-- **Sky view and night planner.** What you see facing one direction at one
-  moment, with the horizon, dusk glow, bright stars and well-known
-  constellations. Drag through the night or press play; turn left and right.
-  "Show in the sky" on each planet card jumps to its best moment.
+- **Sky view, sky chart and night planner.** The horizon view shows what you
+  see facing one direction at one moment, with dusk glow, bright stars and
+  well-known constellations; the sky chart shows the whole sky looking
+  straight up. Drag through the night or press play; turn left and right.
+  Opening a planet row jumps to its best moment and puts it in focus.
+- **Tonight at a glance.** Darkness, Moon phase, how many planets are up and
+  the next special night, in four tiles.
+- **Night instrument design.** Dark by default with a light variant for light
+  system settings, and a red night-vision mode (one button) that keeps your
+  eyes adapted to the dark when you use it outside.
 - **Mail alerts.** Up to 10 places per account, each with its own planets and
   event types. Everything for one day goes out in a single mail, in a time
   slot the user picks (morning, midday, afternoon or evening, in any time
@@ -42,15 +48,19 @@ API. The sky calculations run on a separate small server, see
 
 ## Screenshots
 
-| City page | "Show in the sky" |
+| City page | A planet in focus |
 | --- | --- |
-| ![City page with planet cards and the night panel](docs/screenshots/city.png) | ![Sky view facing south at Jupiter's best moment](docs/screenshots/show-in-sky.png) |
+| ![City page with glance tiles, planet rows and the night panel](docs/screenshots/city.png) | ![Horizon view facing south at Jupiter's best moment](docs/screenshots/show-in-sky.png) |
+
+| Sky chart | Light variant |
+| --- | --- |
+| ![Sky chart: the whole sky looking straight up, with stars, constellations and Saturn](docs/screenshots/sky-chart.png) | ![City page in the light variant](docs/screenshots/city-light.png) |
 
 | Your places | The mail |
 | --- | --- |
-| ![List of watched places with switches and upcoming mails](docs/screenshots/my-alerts.png) | ![Alert mail with directions for each planet](docs/screenshots/mail.png) |
+| ![List of watched places with switches and upcoming mails](docs/screenshots/my-alerts.png) | ![Alert mail: “Tomorrow morning over Tuttlingen”, a rare chance for Mercury](docs/screenshots/mail.png) |
 
-![Phone, dark mode: start page, planet cards and the night panel](docs/screenshots/mobile.png)
+![Phones: start page, city page, night panel, and the red night-vision mode](docs/screenshots/mobile.png)
 
 ![Status page with health and 90-day uptime (demo data)](docs/screenshots/status.png)
 
@@ -285,6 +295,16 @@ monitoring tools. Every run of the mail job records whether the calc server
 answered (`status_checks`); daily totals live in `stat_counters`. Only totals
 are stored, and places are only named once at least 3 accounts watch them.
 
+### Design
+
+One stylesheet, `public/assets/style.css`, with all colours as variables at
+the top: dark by default, a light set under `prefers-color-scheme: light`,
+and the sky panel always dark. The red night-vision mode
+(`public/assets/night.js`) turns the whole page into shades of red; the
+choice is kept in the browser's local storage (listed on the privacy page).
+The sky view and sky chart are drawn in `public/assets/sky.js` from the
+night's track plus a built-in list of bright stars.
+
 ### Languages
 
 Every text is in `lang/*.php`, one file per language, named by its two-letter
@@ -405,3 +425,6 @@ service, you have to offer its source code to its users. The footer link to
   site footer.
 - Mail: [PHPMailer](https://github.com/PHPMailer/PHPMailer) 6.10 (LGPL-2.1),
   bundled in `vendor/phpmailer`.
+- Fonts: Inter, Space Grotesk and IBM Plex Mono (SIL Open Font License 1.1),
+  self-hosted in `public/assets/fonts` so no visitor data goes to a font
+  service.

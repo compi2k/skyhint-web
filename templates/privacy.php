@@ -71,6 +71,7 @@ $authority = $cfg['authority'] ?? [];
   <ul>
     <li><?= e(t('privacy.cookies_session')) ?></li>
     <li><?= e(t('privacy.cookies_lang')) ?></li>
+    <li><?= e(t('privacy.cookies_night')) ?></li>
     <?php if ($stats): ?><li><?= e(t('privacy.cookies_optout')) ?></li><?php endif; ?>
   </ul>
   <p><?= e(t('privacy.cookies_end')) ?></p>

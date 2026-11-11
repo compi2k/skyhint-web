@@ -4,6 +4,7 @@
  * @var string $planet
  * @var array  $vis    the planet's entry from the night record (best, windows, magnitude)
  * @var bool   $south  southern hemisphere: the noon Sun stands in the north
+ * @var bool   $open   shown opened
  */
 use PlanetAlerts\Format;
 
@@ -35,10 +36,18 @@ $arcR = 34;
 $ax = $gx + 6 + cos($a) * $arcR;
 $ay = $eye - sin($a) * $arcR;
 ?>
-<article class="findcard planet-edge-<?= e($planet) ?>" aria-labelledby="<?= $id ?>">
-  <h3 id="<?= $id ?>"><span class="dot planet-<?= e($planet) ?>" aria-hidden="true"></span><?= e($name) ?></h3>
-  <p class="findcard-when"><?= e(t('find.when', ['from' => $from, 'to' => $to])) ?></p>
+<details class="findcard" data-planet="<?= e($planet) ?>"<?= !empty($open) ? ' open' : '' ?>>
+  <summary>
+    <span class="fc-head">
+      <span class="glyph planet-<?= e($planet) ?>" aria-hidden="true"></span>
+      <span class="fc-name" id="<?= $id ?>"><?= e($name) ?></span>
+      <span class="fc-best mono"><?= e(Format::time($best['time'])) ?></span>
+    </span>
+    <span class="fc-meta mono"><?= e(t('find.meta', ['dir' => t("dir.short.$dir"), 'alt' => round($alt), 'height' => Format::height($alt)])) ?>
+      · <?= e(t('find.span', ['from' => $from, 'to' => $to])) ?></span>
+  </summary>
 
+  <div class="fc-body">
   <div class="findcard-figures">
     <figure>
       <svg viewBox="0 0 128 128" role="img" aria-label="<?= e(t('find.turn_label', ['dir' => t("dir.$dir")])) ?>">
@@ -82,4 +91,5 @@ $ay = $eye - sin($a) * $arcR;
   <button type="button" class="show-in-sky" data-show="<?= e($planet) ?>" hidden>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18"/><circle cx="15" cy="9" r="2.5"/><path d="M15 3v2M15 13v2M9 9h2M19 9h2"/></svg>
     <?= e(t('find.show')) ?></button>
-</article>
+  </div>
+</details>
