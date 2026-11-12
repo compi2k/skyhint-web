@@ -72,6 +72,10 @@ use PlanetAlerts\I18n;
       <a href="<?= e((string) App::config('app.source_url', 'https://github.com/compi2k/skyhint-web')) ?>"><?= e(t('nav.source')) ?></a>
     </p>
     <p class="credits"><?= t('footer.credits') ?></p>
+    <?php if (App::config('app.show_version', true)): ?>
+      <p class="version"><a href="<?= e(rtrim((string) App::config('app.source_url', 'https://github.com/compi2k/skyhint-web'), '/') . '/blob/main/CHANGELOG.md') ?>"
+        title="<?= e(t('footer.changelog')) ?>">Skyhint.app <?= e(App::version()) ?></a></p>
+    <?php endif; ?>
   </footer>
 </body>
 </html>

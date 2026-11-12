@@ -20,6 +20,7 @@ return [
     'nav.api' => 'API',
     'nav.source' => 'Quellcode',
     'footer.credits' => 'Positionen berechnet mit <a href="https://github.com/cosinekitty/astronomy">Astronomy Engine</a>. Ortsdaten von <a href="https://www.geonames.org">GeoNames</a> (CC BY 4.0).',
+    'footer.changelog' => "Was ist neu?",
 
     // words, dates
     'word.and' => 'und',
@@ -524,6 +525,7 @@ return [
     'status.overall.down' => 'Die Himmelsberechnungen sind gerade nicht erreichbar. Manche Seiten zeigen deshalb einen Fehler; die Mails gehen raus, sobald alles wieder läuft.',
     'status.updated' => 'Stand {time} Uhr, jede Minute neu. Für Monitoring-Tools:',
     'status.parts' => 'Bestandteile',
+    'status.web_detail' => 'Version {version}, PHP {php}',
     'status.part.web' => 'Website',
     'status.part.db' => 'Datenbank',
     'status.part.calc' => 'Himmelsberechnungen',

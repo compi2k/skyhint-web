@@ -34,6 +34,7 @@ final class Status
         Http::json([
             'status'        => $s['overall'],
             'generated_at'  => $s['generated_at'],
+            'version'       => App::version(),
             'calc'          => $s['calc'],
             'mail_job'      => $s['job'],
             'uptime'        => $s['uptime'],

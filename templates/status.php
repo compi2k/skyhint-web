@@ -31,7 +31,7 @@ $weekdays = [1, 2, 3, 4, 5, 6, 0];
   <h2><?= e(t('status.parts')) ?></h2>
   <table class="plain status-parts">
     <tbody>
-      <tr><td><?= $icon('ok') ?> <?= e(t('status.part.web')) ?></td><td><?= e(t('status.state.ok')) ?></td><td class="quiet"></td></tr>
+      <tr><td><?= $icon('ok') ?> <?= e(t('status.part.web')) ?></td><td><?= e(t('status.state.ok')) ?></td><td class="quiet"><?= e(t('status.web_detail', ['version' => \PlanetAlerts\App::version(), 'php' => PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION])) ?></td></tr>
       <tr><td><?= $icon('ok') ?> <?= e(t('status.part.db')) ?></td><td><?= e(t('status.state.ok')) ?></td><td class="quiet"><?= e(t('status.ms', ['n' => $s['db_ms']])) ?></td></tr>
       <tr><td><?= $icon($c['ok'] ? 'ok' : 'down') ?> <?= e(t('status.part.calc')) ?></td>
           <td><?= e(t($c['ok'] ? 'status.state.ok' : 'status.state.down')) ?></td>

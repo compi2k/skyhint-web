@@ -24,7 +24,7 @@ $say = static function (bool $good, string $msg) use (&$ok): void {
     $ok = $ok && $good;
 };
 
-echo 'PHP ' . PHP_VERSION . "\n";
+echo 'Skyhint.app ' . App::version() . ', PHP ' . PHP_VERSION . "\n";
 foreach (['pdo_mysql', 'curl', 'mbstring', 'openssl'] as $ext) {
     $say(extension_loaded($ext), "PHP extension $ext");
 }

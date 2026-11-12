@@ -188,6 +188,9 @@ pre { font-family: var(--mono); font-size: .88rem; background: var(--surface); b
 .footer-links a:hover { color: var(--ink); text-decoration: underline; }
 .credits { margin: .75rem 0 0; }
 .credits a { color: var(--slate); }
+.version { margin: .5rem 0 0; font-family: var(--mono); font-size: .78rem; }
+.version a { color: var(--slate); text-decoration: none; }
+.version a:hover { color: var(--ink); text-decoration: underline; }
 
 /* language dropdown in the header */
 .lang-switch { display: inline-flex; align-items: center; gap: .3rem; margin: 0 .2rem; }

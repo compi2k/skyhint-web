@@ -203,6 +203,7 @@ repository. The important keys:
 | `banner.text`, `banner.style`, `banner.link` | Optional banner across the top of every page, e.g. "Prototype under construction"; text per language or one for all; styles `info`, `warning`, `danger`, `construction` |
 | `matomo.url`, `matomo.site_id`, `matomo.retention_days` | Optional visitor statistics, see [Visitor statistics](#visitor-statistics-optional) |
 | `imprint.*` | Name, address and contact for the legal notice and `/privacy` |
+| `app.show_version`, `app.version_label` | Version number in the footer, optional label such as `beta` |
 
 ## Update
 
@@ -210,6 +211,12 @@ repository. The important keys:
 cd skyhint-web && git pull        # or upload the new files over the old ones
 php bin/setup.php                 # upgrades the database if needed
 ```
+
+`setup.php` prints the installed version on its first line; the footer and
+the status page show it too. What changed in each version is in
+[CHANGELOG.md](CHANGELOG.md). Version numbers: the last digit for fixes, the
+middle one for new features, the first one for changes that need manual work
+when updating.
 
 `config/config.php` and `storage/` are never overwritten. Older installations
 with one alert per account are migrated automatically: each account's city and

@@ -20,6 +20,7 @@ return [
     'nav.api' => 'API',
     'nav.source' => 'Source code',
     'footer.credits' => 'Positions calculated with <a href="https://github.com/cosinekitty/astronomy">Astronomy Engine</a>. City data from <a href="https://www.geonames.org">GeoNames</a> (CC BY 4.0).',
+    'footer.changelog' => "What's new?",
 
     // words, dates
     'word.and' => 'and',
@@ -524,6 +525,7 @@ return [
     'status.overall.down' => 'Sky calculations are unreachable right now. Pages may show an error; mails will be sent once it is back.',
     'status.updated' => 'Updated at {time}, refreshed every minute. For monitoring tools:',
     'status.parts' => 'Parts',
+    'status.web_detail' => 'Version {version}, PHP {php}',
     'status.part.web' => 'Website',
     'status.part.db' => 'Database',
     'status.part.calc' => 'Sky calculations',

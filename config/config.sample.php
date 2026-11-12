@@ -22,6 +22,11 @@ return [
         // Where the source code of this installation is published (AGPL-3.0: users of a
         // hosted copy must be able to get its source). Change it if you run a modified copy.
         'source_url'   => 'https://github.com/compi2k/skyhint-web',
+        // Version number in the footer (it links to the changelog). The number itself comes from
+        // the VERSION file with each update; status page and setup always show it.
+        'show_version' => true,
+        // Optional label after the number, e.g. 'beta' gives "1.2.3-beta". Letters, digits and dots.
+        'version_label' => '',
         // Show detailed errors in the browser. Never true in production.
         'debug'        => false,
     ],

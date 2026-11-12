@@ -74,6 +74,19 @@ final class App
         return (string) self::config('app.name', 'Skyhint.app');
     }
 
+    /**
+     * Version of this installation: the VERSION file that comes with the code, plus an optional
+     * label from config.php (app.version_label, e.g. "beta"). The number itself is never set in
+     * config.php, because that file is not replaced on updates and would go stale.
+     */
+    public static function version(bool $withLabel = true): string
+    {
+        static $v = null;
+        $v ??= trim((string) @file_get_contents(APP_ROOT . '/VERSION')) ?: '0.0.0';
+        $label = $withLabel ? preg_replace('/[^A-Za-z0-9.]+/', '', (string) self::config('app.version_label', '')) : '';
+        return $label !== '' ? "$v-$label" : $v;
+    }
+
     public static function log(string $message): void
     {
         $line = sprintf("[%s] %s\n", gmdate('Y-m-d H:i:s'), $message);
