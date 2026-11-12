@@ -446,6 +446,8 @@ return [
     'night.lead' => 'Pick a time in the planner, turn around, or switch to the sky chart.',
     'night.turn_left' => 'Turn left',
     'night.turn_right' => 'Turn right',
+    'night.auto' => 'Auto',
+    'night.auto_label' => 'Turn with the planets automatically',
     'planner.label' => 'When each planet is up tonight.',
     'planner.good' => 'good to see {spans}.',
     'planner.not_good' => 'never high enough in a dark sky.',

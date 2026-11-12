@@ -446,6 +446,8 @@ return [
     'night.lead' => 'Wähl im Planer eine Uhrzeit, dreh dich oder wechsel zur Himmelskarte.',
     'night.turn_left' => 'Nach links drehen',
     'night.turn_right' => 'Nach rechts drehen',
+    'night.auto' => 'Auto',
+    'night.auto_label' => 'Automatisch mit den Planeten drehen',
     'planner.label' => 'Wann die Planeten heute Nacht am Himmel stehen.',
     'planner.good' => 'gut zu sehen {spans}.',
     'planner.not_good' => 'steht nie hoch genug, solange es dunkel ist.',

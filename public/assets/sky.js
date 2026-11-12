@@ -12,6 +12,7 @@
 
   var stage = view.querySelector('.skyview-stage');
   var facingEl = view.querySelector('.facing');
+  var autoBtn = view.querySelector('[data-turn-auto]');
   // the home page shows the view alone; the city page adds time controls and the planner
   var controls = document.querySelector('[data-sky-controls]') || document.createElement('div');
   var dummy = function (tag) { return controls.querySelector(tag) || document.createElement('span'); };
@@ -162,7 +163,7 @@
         var d = Math.abs(((b.az - F + 540) % 360) - 180);
         if (d <= fov / 2 - 8) score += b.name === 'moon' ? 1 : (b.alt >= (MIN_ALT[b.name] || 10) ? 3 : 1);
       });
-      if (F === facing) score += 0.5;          // don't turn for nothing
+      if (F === facing) score += 1.5;          // don't flip back and forth when planets hand over
       if (score > bestScore) { bestScore = score; best = F; }
     }
     return best;
@@ -171,6 +172,7 @@
   function draw() {
     if (mode === 'chart') drawChart(index); else drawHorizon(index);
     if (turnRow) turnRow.hidden = mode === 'chart';
+    if (autoBtn) autoBtn.setAttribute('aria-pressed', manual ? 'false' : 'true');
     if (chartHint) chartHint.hidden = mode !== 'chart';
     info(index);
     // the panel stays beside the cards while scrolling, but only if it fits on the screen
@@ -431,7 +433,12 @@
       svg.appendChild(el('text', { 'class': 'sv-dir' + (c === facing ? ' is-facing' : ''), x: X(c).toFixed(1), y: h - 10, 'text-anchor': 'middle' }, L.dir[DIRS[c / 45]]));
     }
     stage.replaceChildren(svg);
-    if (facingEl) facingEl.textContent = L.text.facing.replace('{dir}', L.dirLong[DIRS[facing / 45]]);
+    if (facingEl) {
+      // "Facing" and the direction in two parts, so phones can stack them without the row changing height
+      var parts = L.text.facing.split('{dir}'), dir = document.createElement('strong');
+      dir.textContent = L.dirLong[DIRS[facing / 45]];
+      facingEl.replaceChildren(document.createTextNode(parts[0]), dir, document.createTextNode(parts[1] || ''));
+    }
   }
 
   // the sentence, the time and the planner cursor: the same for both views
@@ -516,6 +523,8 @@
     play.textContent = L.text.pause; play.setAttribute('aria-pressed', 'true');
     timer = setInterval(function () { if (index >= D.times.length - 1) { stop(); return; } setIndex(index + 1); }, 160);
   });
+  // "Auto": follow the planets again after turning by hand
+  if (autoBtn) autoBtn.addEventListener('click', function () { manual = !manual; if (!manual) focus = null; draw(); });
   view.querySelectorAll('[data-turn]').forEach(function (b) {
     b.addEventListener('click', function () { manual = true; focus = null; facing = (facing + (+b.dataset.turn) + 360) % 360; draw(); });
   });

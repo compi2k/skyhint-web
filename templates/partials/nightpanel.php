@@ -28,6 +28,7 @@ use PlanetAlerts\View;
       <button type="button" class="turn" data-turn="-45" aria-label="<?= e(t('night.turn_left')) ?>">‹</button>
       <p class="facing" aria-live="polite"></p>
       <button type="button" class="turn" data-turn="45" aria-label="<?= e(t('night.turn_right')) ?>">›</button>
+      <button type="button" class="turn-auto" data-turn-auto aria-pressed="true" title="<?= e(t('night.auto_label')) ?>"><?= e(t('night.auto')) ?></button>
     </div>
   </div>
 

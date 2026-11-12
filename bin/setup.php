@@ -35,7 +35,15 @@ $say(mb_check_encoding($raw, 'UTF-8'), 'config.php saved as UTF-8' . (mb_check_e
 $say(strlen((string) App::config('app.secret_key')) >= 32 && App::config('app.secret_key') !== 'CHANGE-ME',
     'app.secret_key set');
 $say(str_starts_with((string) App::config('app.url'), 'https://'), 'app.url uses https: ' . App::config('app.url'));
-$say(is_writable(APP_ROOT . '/storage/logs'), 'storage/logs writable');
+$logs = APP_ROOT . '/storage/logs';
+if (!is_dir($logs)) {
+    @mkdir($logs, 0750, true);
+}
+$say(is_writable($logs), 'storage/logs writable' . (is_writable($logs) ? '' : sprintf(
+    ' (%s, owner %s; run setup as the site user, or: chown -R <site user>: storage)',
+    is_dir($logs) ? 'not writable' : 'missing',
+    function_exists('posix_getpwuid') && is_dir($logs) ? (posix_getpwuid((int) fileowner($logs))['name'] ?? '?') : '?'
+)));
 exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(APP_ROOT . '/bin/check-lang.php') . ' 2>&1', $langOut, $langCode);
 $say($langCode === 0, 'text strings: ' . ($langCode === 0 ? $langOut[0] : implode('; ', array_slice($langOut, 0, 3))));
 

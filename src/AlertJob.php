@@ -77,6 +77,13 @@ final class AlertJob
             return;
         }
         $label = "$kind user {$user['id']} $date";
+        if ($late >= MailTime::RETRY_HOURS * 60 && !$run) {
+            // never tried today: the account is new or its mail time was moved to an earlier slot after
+            // that slot had passed. Nothing went wrong, so this is not reported as skipped. The next
+            // mail still covers tonight if it is needed (see Alerts::nightsToAnnounce).
+            $this->record((int) $user['id'], $date, $kind, 'done', 0, 'mail time had already passed today');
+            return;
+        }
         if ($late >= MailTime::RETRY_HOURS * 60) {
             $this->record((int) $user['id'], $date, $kind, 'skipped', 0,
                 $run['message'] ?? 'not processed within ' . MailTime::RETRY_HOURS . ' hours');

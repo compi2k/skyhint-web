@@ -17,6 +17,9 @@ final class App
         ini_set('display_errors', $debug ? '1' : '0');
         error_reporting(E_ALL);
         ini_set('log_errors', '1');
+        if (!is_dir(APP_ROOT . '/storage/logs')) {
+            @mkdir(APP_ROOT . '/storage/logs', 0750, true);   // missing after unpacking an update zip
+        }
         ini_set('error_log', APP_ROOT . '/storage/logs/php-error.log');
     }
 

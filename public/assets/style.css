@@ -470,9 +470,19 @@ tbody th { font-family: var(--sans); font-size: inherit; letter-spacing: 0; text
 .sv-chart-axis { stroke: rgba(255, 255, 255, .07); }
 .sv-chart-alt { fill: rgba(255, 255, 255, .35); font: 9px var(--mono); }
 .sv-chart-glow { opacity: .55; }
-.skyview-turn { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: .5rem 0 .6rem; }
-.skyview-turn .facing { margin: 0; min-width: 10rem; text-align: center; font-family: var(--display); font-weight: 500; font-size: 1.05rem; color: #fff; }
+.skyview-turn { display: flex; align-items: center; justify-content: center; gap: .75rem; margin: .5rem 0 .6rem; }
+.skyview-turn .facing { margin: 0; min-width: 13rem; text-align: center; font-family: var(--display); font-weight: 500; font-size: 1.05rem; color: #fff; }
 .turn { width: 44px; padding: 0; font-size: 1.4rem; line-height: 1; color: #fff; background: rgba(255, 255, 255, .04); border-color: var(--line-strong); border-radius: 50%; }
+.turn-auto { min-height: 34px; padding: 0 .75rem; font-size: .82rem; font-weight: 500; color: var(--slate); background: transparent; border-color: var(--line-strong); border-radius: 999px; }
+.turn-auto[aria-pressed=true] { color: #0B1130; background: var(--accent); border-color: var(--accent); font-weight: 600; }
+@media (max-width: 34rem) {
+  /* phones: "Facing" small above the direction, so the row keeps one height */
+  .skyview-turn { gap: .5rem; }
+  .skyview-turn .facing { flex: 1; min-width: 0; font-size: .8rem; font-weight: 400; color: var(--slate); line-height: 1.25; }
+  .skyview-turn .facing strong { display: block; font-size: 1.05rem; font-weight: 500; color: #fff; white-space: nowrap; }
+  .skyview-turn .turn { width: 40px; flex: none; }
+  .turn-auto { flex: none; padding: 0 .65rem; }
+}
 .planner { margin: 0; }
 .planner svg { width: 100%; height: auto; display: block; touch-action: none; }
 .planner svg.planner-narrow { display: none; }
