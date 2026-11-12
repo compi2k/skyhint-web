@@ -395,6 +395,9 @@ php bin/setup.php
 php -S localhost:8080 -t public bin/dev-router.php
 ```
 
+Developer notes, the full local test setup and the end-to-end test
+(`tests/e2e.py`) are described in [CLAUDE.md](CLAUDE.md).
+
 For the calc service, run [skyhint-calc](https://github.com/compi2k/skyhint-calc)
 locally with its six-city test list (see its README) and set `calc.url` to
 `http://127.0.0.1:8100`. To catch mails locally, point `mail.*` at a capture
